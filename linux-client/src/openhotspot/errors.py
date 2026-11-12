@@ -58,7 +58,7 @@ class BluetoothError(TransportError):
     """
 
     def __init__(self, summary: str, hint: str = "", *, retryable: bool = False) -> None:
-        super().__init__(f"{summary}. {hint}" if hint else summary)
+        super().__init__(f"{summary}. {hint[:1].upper()}{hint[1:]}" if hint else summary)
         self.summary, self.hint, self.retryable = summary, hint, retryable
 
 

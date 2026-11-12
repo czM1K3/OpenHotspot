@@ -13,6 +13,7 @@ dependencies = ["cryptography>=42", "bleak>=3.0,<4"]
 
 [project.optional-dependencies]
 keyring = ["keyring>=24"]
+tray = ["pystray>=0.19", "Pillow>=10"]
 dev = ["pytest>=8", "keyring>=24"]
 
 [project.scripts]

@@ -96,7 +96,7 @@ class NmcliConnector(WifiConnector):
         if not hint and "no network with ssid" in low:
             hint = self._not_visible_hint(band)
         text = f"could not join the hotspot (nmcli exit {rc}): {msg}"
-        return WifiError(f"{text}. {hint}" if hint else text)
+        return WifiError(f"{text}. {hint[:1].upper()}{hint[1:]}" if hint else text)
 
     @staticmethod
     def _not_visible_hint(band: Band) -> str:
@@ -130,7 +130,7 @@ class NmcliConnector(WifiConnector):
         hint = next((h for needle, h in _NM_HINTS if needle in low), "")
         if result.returncode == 8:
             hint = hint or "start it with `sudo systemctl enable --now NetworkManager`"
-        return f"{prefix} (nmcli exit {result.returncode}): {text}" + (f". {hint}" if hint else "")
+        return f"{prefix} (nmcli exit {result.returncode}): {text}" + (f". {hint[:1].upper()}{hint[1:]}" if hint else "")
 
     def connect(self, ssid: bytes, passphrase: str, security: Security = Security.WPA2_PSK,
                 band: Band = Band.UNKNOWN) -> None:
