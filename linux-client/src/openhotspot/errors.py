@@ -78,6 +78,10 @@ class NotPairedError(KeyStoreError):
     """No paired phone, or the choice of phone is ambiguous."""
 
 
+class HotspotNotUp(OpenHotspotError):
+    """The phone accepted the request but the hotspot did not reach the ON state."""
+
+
 class ConnectivityError(OpenHotspotError):
     """Joined the hotspot but the internet did not become reachable."""
 
