@@ -84,13 +84,29 @@ Client keys are written as one blob encrypted with a non-exportable AES-256-GCM 
 ## D25. Spec clarifications found by the second implementation
 The counter is an unsigned 64-bit integer, compared unsigned. A pairing label must be valid UTF-8 (else `MALFORMED`). In v1 a nonzero ENABLE `options` byte gets `UNSUPPORTED_REQUEST`. PROTOCOL.md, the Python fake phone and the Kotlin engine all follow. Beyond these, the Kotlin engine reproduced the Python vectors byte for byte on the first run.
 
+## D26. Hotspot control: three backends behind one controller
+`RealHotspotController` implements the existing `HotspotController`. Backends (Shizuku+TetheringManager, Shizuku+`cmd wifi`, local-only) sit behind `HotspotBackend`; Shizuku and the Wi-Fi binder sit behind `ShizukuGateway`, `TetheringApi`, `WifiBinderApi`, `ShellRunner`, so selection, fallback and auto-off are JVM-tested. Details and verification status: `docs/HOTSPOT_BACKENDS.md`. Android 11 is supported by the tethering backend only; the shell backend needs 12+ (Android 11's `start-softap` quotes the SSID).
+
+## D27. Reflection runs in our process, so hidden-API exemption is required
+Shizuku executes only the binder transactions as shell; our code builds `TetheringManager` and `IWifiManager` proxies by reflection in the app process, where hidden-API enforcement applies. We use `org.lsposed.hiddenapibypass` (Apache-2.0) at version 6.1, because 6.2 requires compileSdk 37 which AGP 8.13 does not support. Risk: it may stop working on a future Android release (unverified on 17). Alternative not taken: a Shizuku UserService (runs unrestricted in the shell process) needs AIDL and more plumbing; it is the planned fallback if the bypass fails on the device.
+
+## D28. Shell commands via reflection on `Shizuku.newProcess`
+`newProcess` is `private static` in Shizuku API 13.1.5 (checked with javap). We call it reflectively with an argument array (no shell). A UserService is the supported route but heavier. Revisit together with D27.
+
+## D29. No-internet fallback is on by default, never chosen silently after a credentials problem
+The user asked for the local-only fallback. It is allowed by default, loudly labelled in the UI and log, and switchable off in Settings. A missing-credentials failure stops the fallback chain instead of producing a no-internet hotspot. The protocol cannot yet tell a client that the hotspot has no internet (needs a protocol change: doc and vectors first).
+
+## D30. Auto-off and credential rules
+Auto-off: shorter of client request and user setting wins; unknown client count means no auto-off. Credentials: the tethering backend reports the saved system config (what the OS actually starts), the shell backend the user entry. User-entered passphrases are stored Keystore-encrypted. The log and diagnostics export never contain SSIDs or passphrases (`Redactor`, only lengths in test steps).
+
 ## Dependencies and licenses
 
 | Dependency | Where | License | Status |
 |---|---|---|---|
 | Python standard library | `docs/tools/gen_vectors.py` | PSF | used |
 | `cryptography` | `linux-client` (required); optional cross-check in `gen_vectors.py` | Apache-2.0 OR BSD-3-Clause | used |
-| Shizuku API | phone-app (planned) | Apache-2.0 | planned, to be verified when added |
+| Shizuku `api` and `provider` 13.1.5 | `:phone-app` | MIT (per the artifact POM; corrects the earlier Apache-2.0 guess) | used |
+| `org.lsposed.hiddenapibypass` 6.1 | `:phone-app` | Apache-2.0 (per POM) | used |
 | `bleak` | linux-client BLE transport (Batch 4) | MIT | not added |
 | `keyring` | linux-client optional extra | MIT | used (optional) |
 | `secretstorage` | via `keyring` on Linux (transitive) | BSD-3-Clause | transitive, optional |
