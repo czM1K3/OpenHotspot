@@ -63,9 +63,14 @@ class ShellCommandBackendTest {
     @Test fun probeChecksThatStartSoftapExists() = runTest {
         val ok = make(FakeShell { ShellResult(0, help12, "") }).probe()
         assertTrue(assertIs<ProbeResult.Available>(ok).detail.contains("wpa3 supported"))
-        val missing = assertIs<ProbeResult.Unavailable>(make(FakeShell { ShellResult(0, "Wi-Fi (wifi) commands:\n  get-country-code\n  start-lohs <ssid>\n", "") }).probe())
+        val helpWithoutIt = "Wi-Fi (wifi) commands:\n  get-country-code\n  start-lohs <ssid>\n"
+        // Unknown command: cmd prints the whole help again.
+        val missing = assertIs<ProbeResult.Unavailable>(make(FakeShell { ShellResult(255, helpWithoutIt, "") }).probe())
         assertEquals(FailureKind.UNSUPPORTED, missing.kind)
         assertTrue("get-country-code start-lohs" in missing.reason, "the reason must list what cmd wifi does offer")
+        // Help truncated before start-softap (seen on Android 17), but the command exists: a bare call fails on the missing argument.
+        val truncated = make(FakeShell { a -> if (a.size == 2 + 1 && a[2] == "start-softap") ShellResult(255, "", "Exception occurred while executing 'start-softap':\njava.lang.IllegalArgumentException: Argument expected") else ShellResult(255, helpWithoutIt, "") })
+        assertTrue(assertIs<ProbeResult.Available>(truncated.probe()).detail.contains("start-softap exists"))
         // help printed on stderr is found too
         assertIs<ProbeResult.Available>(make(FakeShell { ShellResult(255, "", help12) }).probe())
         // Android 17 prints the help and exits 255: that must still count as available.

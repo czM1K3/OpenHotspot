@@ -104,11 +104,7 @@ class ShellCommandBackend(
             when {
                 help.isBlank() -> ProbeResult.Unavailable(FailureKind.API_UNAVAILABLE, "'cmd wifi help' printed nothing (exit ${r.exitCode})")
                 help.contains("Can't find service") -> ProbeResult.Unavailable(FailureKind.API_UNAVAILABLE, "cmd cannot find the wifi service: ${Redactor.redact(help, emptyList(), 120)}")
-                !help.contains("start-softap") -> ProbeResult.Unavailable(
-                    FailureKind.UNSUPPORTED,
-                    "'cmd wifi help' (exit ${r.exitCode}, ${help.length} chars, stdout ${r.stdout.length}) does not list start-softap; " +
-                        "commands it lists: ${ShellCommands.commandNames(help)}",
-                )
+                !help.contains("start-softap") -> probeByCall(r, help)
                 else -> ProbeResult.Available(
                     "cmd wifi lists start-softap" + (if (supportsWpa3(help)) " (wpa3 supported)" else " (wpa2 only)") +
                         "; may not share internet on every Android version",
@@ -160,6 +156,30 @@ class ShellCommandBackend(
             if ((state == SoftApMapping.WIFI_AP_STATE_ENABLED) == enabled) return true
             if (clock.monotonicMs() >= deadline) return false
             delay(pollMs)
+        }
+    }
+
+    /**
+     * On the Nothing A059 (Android 17) `cmd wifi help` is 12.5k characters and stops before start-softap, which AOSP
+     * lists near the end, so the help is not a reliable inventory. Calling the command with no arguments is safe (it
+     * fails on the missing SSID before touching anything) and tells a real command (error text) from an unknown one
+     * (the whole help text again).
+     */
+    private suspend fun probeByCall(helpResult: ShellResult, help: String): ProbeResult {
+        val r = shell.run(listOf("cmd", "wifi", "start-softap"), 8_000)
+        val out = r.stdout + "\n" + r.stderr
+        val unknown = out.contains("Wi-Fi (wifi) commands") || out.isBlank()
+        return if (unknown) {
+            ProbeResult.Unavailable(
+                FailureKind.UNSUPPORTED,
+                "start-softap is not a known 'cmd wifi' command (help exit ${helpResult.exitCode}, ${help.length} chars; " +
+                    "commands listed: ${ShellCommands.commandNames(help)})",
+            )
+        } else {
+            ProbeResult.Available(
+                "cmd wifi start-softap exists (not in the ${help.length}-char help text; bare call said: ${Redactor.redact(out, emptyList(), 100)}); " +
+                    "may not share internet on every Android version",
+            )
         }
     }
 
