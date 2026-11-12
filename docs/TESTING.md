@@ -31,7 +31,7 @@ Notation: **P** = on the phone, **L** = on the Linux laptop, **T** = on the tabl
 - [ ] **L** `openhotspot pair "$(zbarcam --raw -1 /dev/video0)"` prints *Paired*. **P** lists the laptop under its label with *0 requests*, and the QR screen reverts to the *Show pairing QR* button (window closed after one use).
 - [ ] The same QR scanned again (second device or a photo taken earlier) is refused: the client says the phone is not in pairing mode.
 - [ ] **Expiry.** Show a QR, wait 125 s, scan: refused; the phone's countdown stopped and the QR disappeared at 0.
-- [ ] **Three strikes.** Show a QR; from a second client run `openhotspot pair` with a *wrong but well-formed* QR for this phone (edit the last characters of the secret) three times: after the third the phone's QR disappears. A fourth with the *correct* QR fails (needs a new QR).
+- [ ] **Three strikes** (not reachable with the normal client, which finds the phone by a token derived from the QR secret and so never connects with a wrong one). Covered by the unit test `wrongSecretIsRejectedAndThreeFailuresCloseTheWindow` only; over the air it needs a custom BLE script that connects to the phone while the QR is shown and writes three bad `PAIR_REQ` frames: afterwards the QR must disappear. Mark *not tested* if you skip it.
 - [ ] **Leaving the screen.** Show a QR, press Home: on return the QR is gone (window closed).
 - [ ] **T** Pair the tablet by camera, then a second time by pasting the link; both leave the phone showing separate entries. Pair clients until 8 are paired: the 9th is refused (`TOO_MANY_CLIENTS`).
 - [ ] After pairing, `grep -ri -E 'ltk|passphrase' ` on `adb logcat -d` of the phone shows no key or password values.
