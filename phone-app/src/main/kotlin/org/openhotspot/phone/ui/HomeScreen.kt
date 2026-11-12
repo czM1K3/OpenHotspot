@@ -57,12 +57,7 @@ fun HomeScreen(modifier: Modifier = Modifier) {
     Column(modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("OpenHotspot", style = MaterialTheme.typography.headlineMedium)
 
-        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
-            Column(Modifier.padding(16.dp)) {
-                Text("Fake backend", style = MaterialTheme.typography.titleMedium)
-                Text("This build does not start a real hotspot. A valid request returns made-up credentials. The Shizuku backend comes in a later batch.")
-            }
-        }
+        HotspotCard()
 
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

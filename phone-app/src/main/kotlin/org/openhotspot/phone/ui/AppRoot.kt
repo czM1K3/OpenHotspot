@@ -12,7 +12,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 
-private val TABS = listOf("Status" to "⌂", "Pairing" to "⊞", "Log" to "≡")
+private val TABS = listOf("Status" to "⌂", "Pairing" to "⊞", "Settings" to "⚙", "Diag" to "✚", "Log" to "≡")
 
 @Composable
 fun AppRoot() {
@@ -30,6 +30,8 @@ fun AppRoot() {
         when (tab) {
             0 -> HomeScreen(m)
             1 -> PairingScreen(m, active = tab == 1)
+            2 -> SettingsScreen(m)
+            3 -> DiagnosticsScreen(m)
             else -> LogScreen(m)
         }
     }

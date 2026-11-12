@@ -5,6 +5,7 @@ import android.content.Context
 import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.openhotspot.common.phone.HotspotController
+import org.openhotspot.common.phone.LogLevel
 import org.openhotspot.common.phone.PhoneEngine
 import org.openhotspot.common.phone.RateLimiter
 import org.openhotspot.common.phone.SystemClock
@@ -13,7 +14,22 @@ import org.openhotspot.phone.data.EncryptedClientStore
 import org.openhotspot.phone.data.LogBuffer
 import org.openhotspot.phone.data.RateLimitPrefs
 import org.openhotspot.phone.data.Settings
-import org.openhotspot.phone.hotspot.FakeBackend
+import android.os.Build
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import org.openhotspot.phone.data.HotspotPrefs
+import org.openhotspot.phone.hotspot.DiagnosticsRunner
+import org.openhotspot.phone.hotspot.LocalOnlyBackend
+import org.openhotspot.phone.hotspot.RealHotspotController
+import org.openhotspot.phone.hotspot.ReflectiveTetheringApi
+import org.openhotspot.phone.hotspot.ReflectiveWifiBinderApi
+import org.openhotspot.phone.hotspot.ShellCommandBackend
+import org.openhotspot.phone.hotspot.ShizukuGateway
+import org.openhotspot.phone.hotspot.ShizukuGatewayImpl
+import org.openhotspot.phone.hotspot.ShizukuShellRunner
+import org.openhotspot.phone.hotspot.ShizukuTetheringBackend
 
 /** What the UI shows about the foreground service and BLE. */
 data class ServiceStatus(
@@ -29,14 +45,33 @@ class AppGraph(context: Context) {
     val settings = Settings(context)
     val store = EncryptedClientStore(File(context.noBackupFilesDir, "clients.bin"), AndroidKeystoreCipher(), log)
 
-    /** Batch 3: FAKE backend. Swap for the Shizuku-backed controller in a later batch. */
-    val hotspot: HotspotController = FakeBackend(log)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    val hotspotPrefs = HotspotPrefs(context, AndroidKeystoreCipher(), log)
+    val shizuku: ShizukuGateway = ShizukuGatewayImpl(context) { log.add(LogLevel.INFO, it) }
+    val wifiApi = ReflectiveWifiBinderApi()
+
+    /** Real backends, in priority order. The controller probes them and falls back down this list. */
+    val hotspotController = RealHotspotController(
+        backends = listOf(
+            ShizukuTetheringBackend(shizuku, ReflectiveTetheringApi(context, log), wifiApi, log),
+            ShellCommandBackend(shizuku, ShizukuShellRunner(), wifiApi, Build.VERSION.SDK_INT, log),
+            LocalOnlyBackend(context, log),
+        ),
+        wifi = wifiApi, settings = hotspotPrefs, scope = scope, clock = SystemClock, log = log,
+    )
+    val hotspot: HotspotController = hotspotController
+    val diagnostics = DiagnosticsRunner(hotspotController, SystemClock, log)
 
     val engine = PhoneEngine(
         store, hotspot, SystemClock, log = log,
         limiter = RateLimiter(SystemClock, RateLimitPrefs(context)),
     )
     val serviceStatus = MutableStateFlow(ServiceStatus())
+
+    init {
+        // Capability detection runs at start and whenever Shizuku appears, dies or is (de)authorized.
+        scope.launch { shizuku.status.collect { hotspotController.refresh() } }
+    }
 }
 
 class OpenHotspotApp : Application() {
