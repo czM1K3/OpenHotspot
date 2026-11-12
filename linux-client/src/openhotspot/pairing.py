@@ -9,7 +9,7 @@ import secrets
 import struct
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from . import crypto
 from .constants import (
@@ -32,7 +32,7 @@ class PairingQr:
     version: int
     service_uuid: bytes
     phone_pub: bytes
-    secret: bytes
+    secret: bytes = field(repr=False)
 
     @classmethod
     def parse(cls, text: str) -> PairingQr:
@@ -59,9 +59,9 @@ class PairingQr:
 
 @dataclass(frozen=True)
 class SessionKeys:
-    k_req: bytes
-    k_resp: bytes
-    k_adv: bytes
+    k_req: bytes = field(repr=False)
+    k_resp: bytes = field(repr=False)
+    k_adv: bytes = field(repr=False)
 
 
 def derive_session_keys(ltk: bytes) -> SessionKeys:
@@ -95,7 +95,7 @@ class PairedPhone:
     """Everything the client stores about one paired phone. ``ltk`` is secret."""
 
     phone_id: str
-    ltk: bytes
+    ltk: bytes = field(repr=False)
     phone_pub: bytes
     label: str = ""  # the label *we* gave ourselves, kept for display
     counter: int = 0  # last request counter used (persisted before sending)

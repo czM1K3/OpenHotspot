@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import struct
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from .constants import Band, ErrorCode, HotspotState, Security
 from .errors import ProtocolError
@@ -50,7 +50,7 @@ class HotspotInfo:
     security: Security = Security.WPA2_PSK
     band: Band = Band.UNKNOWN
     ssid: bytes = b""
-    passphrase: str = ""
+    passphrase: str = field(default="", repr=False)
 
     def encode(self) -> bytes:
         pw = self.passphrase.encode()

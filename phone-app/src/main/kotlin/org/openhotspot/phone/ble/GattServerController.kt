@@ -83,7 +83,8 @@ class GattServerController(
         val outgoing = Channel<Outgoing>(Channel.UNLIMITED)
         @Volatile var responseNotify = false
         @Volatile var statusNotify = false
-        @Volatile var lastActivityMs = System.currentTimeMillis()
+        val connectedAtMs = System.currentTimeMillis()
+        @Volatile var lastActivityMs = connectedAtMs
         @Volatile var pendingSent: CompletableDeferred<Unit>? = null
         private val jobs = mutableListOf<Job>()
 
@@ -118,8 +119,11 @@ class GattServerController(
             jobs += scope.launch { // idle timeout: 10 s before authenticating, 30 s after (PROTOCOL.md section 7)
                 while (isActive) {
                     delay(1000)
-                    val limit = if (link.authenticated) 30_000 else 10_000
-                    if (System.currentTimeMillis() - lastActivityMs > limit) {
+                    // Unauthenticated peers get a hard 10 s from connecting: junk, CCCD writes or half-sent
+                    // frames must not keep the single unauthenticated slot occupied (SECURITY.md section 3).
+                    val now = System.currentTimeMillis()
+                    val expired = if (link.authenticated) now - lastActivityMs > 30_000 else now - connectedAtMs > 10_000
+                    if (expired) {
                         log.add(LogLevel.INFO, "Closing an idle connection")
                         server?.cancelConnection(device)
                         break

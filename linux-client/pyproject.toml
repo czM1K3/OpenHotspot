@@ -37,7 +37,7 @@ select = ["E", "F", "W", "I", "B", "UP", "S"]
 ignore = ["S101", "S603", "S607", "S110", "UP042", "E501"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["S", "B", "E402", "E702", "E731"]
+"tests/*" = ["S", "B", "E402", "E702", "E731", "F811"]  # F811: pytest fixtures imported by name
 
 [tool.mypy]
 python_version = "3.11"

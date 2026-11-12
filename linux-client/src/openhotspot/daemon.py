@@ -208,7 +208,7 @@ class Daemon:
         try:
             info = await connect_flow(
                 self.client, phone, self.wifi, self.connectivity, adv=adv, auto_off_s=c.auto_off_s,
-                verify=c.verify, verify_timeout_s=c.verify_timeout_s, say=lambda m: log.info("%s", m),
+                verify=c.verify, verify_timeout_s=c.verify_timeout_s, say=lambda m: log.info("%s", "Hotspot is on. Joining..." if m.startswith("Hotspot on") else m)  # no SSID in logs,
             )
         except ConnectivityError as exc:
             # Joined, but no internet. A network that goes nowhere is worse than none (it can stop
@@ -226,7 +226,7 @@ class Daemon:
             return TickResult(d.failure_cooldown_s, Activity.ERROR, message)
         self._quiet_until = self.clock() + d.cooldown_s
         ssid = info.ssid.decode(errors="replace")
-        log.info("connected to '%s'", ssid)
+        log.info("connected to the phone's hotspot")  # the SSID is a credential: not logged
         self.notifier.notify("Connected to your phone's hotspot", ssid)
         return TickResult(d.idle_interval_s, Activity.CONNECTED, ssid)
 
