@@ -1,8 +1,83 @@
 # Setup
 
-The **Linux** and **Android tablet** sections are written. The phone section (Shizuku, battery exemption, pairing screen) is still to do; until then see `phone-app/` and `docs/HOTSPOT_BACKENDS.md`. You need a phone running the OpenHotspot app with Shizuku started, and its pairing QR on screen, to follow the steps below.
+End-to-end setup for the three parts: the **phone** (hotspot provider), a **Linux laptop** and an **Android tablet** (clients). Order: phone first, then pair each client.
 
-Status of everything below: the Linux client's logic, the BLE transport (against a mocked bleak), the daemon, the config and the scripts are unit tested; **nothing has yet been run against a real phone**. `docs/TESTING.md` lists what to check by hand.
+**Honest status.** The phone-side hotspot path (Shizuku + `TetheringManager`) was exercised on one real device through adb-started Shizuku: a Nothing phone (A059) on Android 17, see `docs/HOTSPOT_BACKENDS.md`. Everything else here (the BLE link in both directions, pairing over the air, the Linux client, the tablet app, every OEM note) has been checked against code, unit tests and an emulator only. Statements marked *(unverified)* come from documentation or general knowledge, not from a test. `docs/TESTING.md` is the checklist for turning them into facts.
+
+Contents: [Phone](#phone-android-no-root) · [Linux](#linux) · [Android tablet](#android-tablet) · [Troubleshooting by phone maker](#troubleshooting-by-oem)
+
+## Phone (Android, no root)
+
+### What you need
+
+| Need | Detail |
+|---|---|
+| Android 11 or newer | minSdk 30. Developed against a Nothing phone on Android 17. Only the Shizuku **TetheringManager** backend is expected to work on every version; the `cmd wifi` backend is refused by Android 17 for adb-started Shizuku and is not selected there (HOTSPOT_BACKENDS.md) |
+| BLE peripheral support | the phone must be able to advertise (`Advertising failed` or *BLE advertising unsupported* in the Status tab if not) |
+| [Shizuku](https://shizuku.rikka.app/) | the app accepts server version 11 or newer (it reports *"Shizuku is too old"* below); the app is built against Shizuku API 13.1.5 and the reference test ran API 14, so install the current release. Shizuku is a separate app (Google Play, F-Droid builds and GitHub releases exist; use the source you trust) |
+| A Wi-Fi network, **once per reboot** | only to start Shizuku through wireless debugging (below) |
+| The OpenHotspot phone app | `./gradlew :phone-app:assembleDebug`, then `adb install phone-app/build/outputs/apk/debug/phone-app-debug.apk` or copy the APK to the phone |
+
+No root and no Google Play Services. A computer is optional (only for the USB alternative in step 2).
+
+### 1. Install the apps
+
+Install Shizuku and the OpenHotspot phone app. Open OpenHotspot once.
+
+### 2. Start Shizuku with Wireless debugging (no root, no computer)
+
+Shizuku gets its elevated rights from Android's own debugging service (the same one `adb` talks to). Wireless debugging on Android 11+ lets the phone talk to **itself**, so no cable or PC is needed. Menu names differ per maker; on **Nothing OS** they are approximately as below *(the names are from memory of Nothing OS and AOSP, the exact wording on your build may differ)*.
+
+1. **Developer options.** Settings, About phone, open the software information entry, and tap **Build number** seven times. Enter your PIN. A new *Developer options* entry appears under Settings, System.
+2. **Connect the phone to a Wi-Fi network** (home, office, or another phone's hotspot). Wireless debugging only works while the phone is on Wi-Fi. This is the one step that needs Wi-Fi even though you use the phone as the hotspot later.
+3. In Developer options turn on **Wireless debugging** and allow it for this network when Android asks.
+4. Open **Shizuku**, choose **Start via Wireless debugging**, and follow its prompts: open *Developer options, Wireless debugging, Pair device with pairing code*; Android shows a 6-digit code; type the code into Shizuku's notification (this is why it asks you to use a floating/split-screen window or a notification: the pairing dialog closes if you leave it). Shizuku then shows *Shizuku is running*.
+5. You can now turn Wireless debugging off again; Shizuku keeps running **until the phone reboots** *(per Shizuku's documentation; not tested here)*.
+
+If you have a computer and a USB cable, the alternative that does not need Wi-Fi at all is: enable USB debugging, run `adb shell sh /sdcard/Android/data/moe.shizuku.privileged.api/start.sh` (Shizuku's own *Start via computer* instructions show the current command). This is the route the real-device test used.
+
+*Optional.* Developer options may offer **Disable adb authorization timeout**; leave it off unless Shizuku asks to be re-paired after a week of non-use *(unverified)*.
+
+### 3. Give OpenHotspot permission to use Shizuku
+
+1. Open OpenHotspot, **Status** tab. The *Shizuku* card shows one of: not installed, not running, too old, **running but OpenHotspot is not authorized**, ready.
+2. Tap **Authorize OpenHotspot** and choose **Allow** in the Shizuku dialog. The card turns to *Shizuku is ready* with the server UID (2000 = adb-started, 0 = root).
+3. If you chose *Deny and don't ask again*: open the Shizuku app, **Authorized apps**, and switch OpenHotspot on (the card has an **Open Shizuku** button).
+4. Under **Setup** tap **Grant permissions** (Nearby devices for Bluetooth, Notifications), then **Exempt from battery optimisation**, and leave **Start after reboot** on.
+
+On Android 11 the Bluetooth permissions are install-time, so there is no Bluetooth prompt; Android 12+ asks for *Nearby devices*.
+
+### 4. Check that the hotspot can be switched
+
+1. In the phone's normal settings (Settings, Network, Hotspot and tethering), **set the hotspot name and a password once** and choose a band. OpenHotspot starts the hotspot **with this saved configuration** and sends it to the client, so a laptop with an old Wi-Fi card should get **2.4 GHz** and WPA2 or WPA2/WPA3. If Android does not give the app the password (unverified on some builds), type SSID and password into the app's **Settings** tab, *Hotspot credentials* (stored encrypted).
+2. **Diag** tab, **Test hotspot toggle**: it switches the hotspot on, reads the credentials, and off again per backend. On the reference phone the Shizuku **TetheringManager** backend passed. Export the report if something fails.
+3. **Settings** tab: *Auto-off* (minutes without a connected client, default 10) and *Allow local-only fallback*. The local-only fallback is a hotspot **without internet**; leave it off unless you know you want it.
+4. **Status** tab: **Start service**. It shows a permanent notification; that is what keeps Bluetooth advertising alive.
+
+### 5. Pair a client
+
+1. Phone, **Pairing** tab, **Show pairing QR**. The code lasts 120 seconds, works for **one** device, is hidden from screenshots, and disappears if you leave the screen. Anyone who photographs it in that time can pair, so do it privately.
+2. Linux: `openhotspot pair "$(zbarcam --raw -1 /dev/video0)"` (see below). Tablet: *Pair a phone* in the app and scan, or paste the `openhotspot://pair/...` link.
+3. The phone lists the new device (name, date, request count). Up to 8 clients. To remove one use **Revoke**; if that device already knows the hotspot password, also **change the hotspot password** in Android's settings (revocation does not change the password).
+4. Test: from the client run connect (`openhotspot connect`, or the tablet's button).
+
+### After a reboot
+
+Shizuku stops when the phone reboots. OpenHotspot restarts its own service automatically if it was running and *Start after reboot* is on, but **the hotspot cannot be switched until Shizuku is running again**, and wireless debugging needs Wi-Fi or a cable. Clients get `SHIZUKU_UNAVAILABLE` meanwhile. Plan for it: restart Shizuku (step 2) once per reboot, e.g. when you next charge at home. Shizuku's own *start on boot* option needs root or an extra permission granted over adb *(unverified here)*; the real-device behaviour after reboot is item 10 of the TESTING.md checklist.
+
+### Phone troubleshooting
+
+| Symptom | Likely cause and fix |
+|---|---|
+| Status says *Shizuku is not installed / not running* | Install it; start it (step 2). It does not survive a reboot |
+| *Running but OpenHotspot is not authorized* | Tap **Authorize OpenHotspot**; or Shizuku, Authorized apps |
+| Backend card shows no backend selected | Open **Diag**, **Re-run detection**; read the reason per backend. `cmd wifi` refused with *Uid 2000 does not have access* is expected on Android 17 |
+| Hotspot starts but the client has no internet | The phone has no mobile data, or the *local-only* fallback was used (red *No internet sharing* card); turn the fallback off |
+| Clients cannot find the phone | Service not running, Bluetooth off, or battery policy killed it (see the OEM table); check the Status tab *Advertising* line |
+| *Advertising failed: too many advertisers / feature unsupported* | The phone's Bluetooth stack cannot advertise right now; toggle Bluetooth; some phones forbid it while a hotspot is on *(unverified)* |
+| *Pairing screen shows a blank/black code area* | `FLAG_SECURE` hides it from screenshots and screen mirroring; look at the physical screen |
+| Hotspot turns itself off | That is **auto-off** (Settings tab). Set 0 to disable. Some makers also have their own idle timeout (*Turn off hotspot automatically* in their hotspot settings) |
+| Repeated *RATE_LIMITED* on a client | The phone saw 5 bad attempts in a minute and is locked out for 30 s up to 1 h. Wait; if it was not you, someone nearby is probing |
 
 ## Linux
 
@@ -153,3 +228,21 @@ So with the default method the internet check proves the hotspot works, but othe
 - *Could not join the hotspot*: Android reports "user declined" and "not found" identically. Approve the prompt; try 2.4 GHz on the phone; set *hidden* in Settings if the hotspot hides its name.
 - *Joined, but the internet is not reachable*: the phone has no mobile data, or it used its local-only fallback (DECISIONS.md D29), or a captive portal intercepts. The check fetches `http://connectivitycheck.gstatic.com/generate_204` over the hotspot (the only cleartext destination the app allows).
 - *The phone did not accept this tablet* (AUTH_FAILED): the phone removed this tablet. The key is kept (an unauthenticated error never deletes it); unpair and pair again.
+
+
+## Troubleshooting by OEM
+
+Background execution and tethering rules differ per maker. **Only the Nothing entry was seen on a real device, and only for the tethering backend**; everything else is general knowledge about those Android skins and may be out of date *(unverified)*. [dontkillmyapp.com](https://dontkillmyapp.com/) keeps a current list of battery-killer behaviour. What to look for is always the same three things: (1) the app is exempt from battery optimisation or "unrestricted", (2) it may auto-start and run in the background, (3) it is not swiped away from recents or put to sleep.
+
+| Maker / skin | What to check |
+|---|---|
+| **Nothing OS** (Nothing Phone, CMF) | Reference device. Hotspot via Shizuku TetheringManager worked on Android 17 (adb-started Shizuku); `cmd wifi` is refused for the shell UID. Still to check: *Settings, Battery, Battery optimisation* set to *Unrestricted* for OpenHotspot, and whether the service and advertising survive screen-off for hours and a reboot (TESTING.md section 10). Nothing OS's *Developer options* are under Settings, System |
+| **Samsung One UI** | *Battery, Background usage limits*: remove OpenHotspot from *Sleeping apps* and *Deep sleeping apps*, add to *Never sleeping apps*, set battery to *Unrestricted*. Turn off *Auto Hotspot* (on a Samsung phone it may switch the hotspot by itself) and *Intelligent Wi-Fi* / *Switch to mobile data* on the tablet while testing. Details in the tablet section. Wireless debugging is under Developer options as on stock Android |
+| **Google Pixel / stock Android** | *Settings, Apps, OpenHotspot, App battery usage* to *Unrestricted*. Adaptive battery may delay but should not kill a foreground service. Android 14+ needs the Nearby devices permission for the service to start |
+| **Xiaomi, Redmi, POCO (HyperOS / MIUI)** | *Settings, Apps, Manage apps, OpenHotspot*: enable **Autostart**, set *Battery saver* to **No restrictions**; lock the app in the recents list. Shizuku and some permission flows may additionally want *USB debugging (Security settings)* and *Install via USB* on MIUI/HyperOS. Aggressive *Memory extension* / cleaner can stop it *(unverified)* |
+| **OnePlus, Oppo, Realme (OxygenOS / ColorOS)** | *Battery, Battery optimisation, OpenHotspot, Don't optimise*; enable **Allow background activity** and **Auto launch**; lock the app in recents. *Deep optimisation* style cleaners are a common cause of stopped BLE advertising *(unverified)* |
+| **Vivo, iQOO (Funtouch / OriginOS)** | *Battery, Background power consumption management*: allow high background power use; enable **Autostart**. Wireless debugging menu may be under *Developer options* with different naming *(unverified)* |
+| **Motorola (near-stock)** | Same as Pixel; also check *Battery, Adaptive battery* *(unverified)* |
+| **Huawei / Honor** | Not supported. Without Google Mobile Services Shizuku installation and Bluetooth behaviour are untested, and EMUI/HarmonyOS restricts background apps heavily |
+
+If the hotspot never turns on but Shizuku is ready, the maker may have stripped or changed the tethering service; run **Diag, Test hotspot toggle** and attach the exported report to an issue.
