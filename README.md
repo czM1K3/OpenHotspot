@@ -2,7 +2,7 @@
 
 Turn on the internet-sharing hotspot of a stock Android phone from a Linux laptop or an Android tablet over Bluetooth LE, and connect automatically, similar to Apple's Instant Hotspot. The phone side uses [Shizuku](https://shizuku.rikka.app/) to toggle tethering without root. No Google Play Services.
 
-**Status: design and scaffolding only. There is no application code yet.**
+**Status: protocol designed; the Linux client's protocol logic and a phone simulator are implemented and tested. No real BLE, no Android code yet.**
 
 ## Layout
 
@@ -11,7 +11,7 @@ Turn on the internet-sharing hotspot of a stock Android phone from a Linux lapto
 | `common/` | Kotlin protocol and crypto, shared by both Android apps | placeholder |
 | `phone-app/` | Android app on the phone (BLE GATT server, Shizuku tethering control) | placeholder |
 | `tablet-app/` | Android app on the tablet (BLE client, Wi-Fi connect) | placeholder |
-| `linux-client/` | Python 3.11+ client (BlueZ, NetworkManager) | placeholder |
+| `linux-client/` | Python 3.11+ client: protocol, FakePhone simulator, CLI. Real BLE pending | working, no BLE |
 | `docs/PROTOCOL.md` | Wire protocol. **Source of truth.** | v1 draft |
 | `docs/SECURITY.md` | Threat model, rate limiting, revocation, key storage | v1 draft |
 | `docs/DECISIONS.md` | Decision log and dependency licenses | started |
