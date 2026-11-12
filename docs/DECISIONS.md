@@ -146,6 +146,14 @@ Same rules as the Linux client (D33 to D35): a dropped BLE link restarts with a 
 ## D42. Tablet key storage and duplication
 `EncryptedPhoneStore` repeats the phone app's Keystore AES-GCM file design (D23) in the tablet module instead of moving it into `:common`, which is pure JVM and has no Keystore; sharing would need a new Android library module. The two copies should be merged when a third consumer appears. No navigation or DI library was added; icons come from `material-icons-core`.
 
+## D43. Review pass (2026-11-12): lint policy, security fixes, CI
+- **Android lint is clean (zero issues) and stays that way.** Real findings were fixed (the `WrongConstant` comparison of `BluetoothGatt.writeDescriptor`/`writeCharacteristic` results against `GATT_SUCCESS` instead of `BluetoothStatusCodes.SUCCESS`, a missing coarse-location pair, obsolete SDK checks, KTX style). Deliberate exceptions live in `phone-app/lint.xml` and `tablet-app/lint.xml`: `OldTargetApi` (targetSdk stays 35: moving to 36 changes behaviour on large screens, which could not be tested without hardware), `BatteryLife` (the apps are sideloaded, not Play-distributed, and need the battery exemption), `PrivateApi` (reflection on hidden APIs is the Shizuku backend). The `commit()` calls on SharedPreferences are intentional (synchronous, must survive a kill) and now use `edit(commit = true)`.
+- **Python lint:** `ruff` (E, F, W, I, B, UP, S) and `mypy` are configured in `pyproject.toml` and run in CI. Ignored rules and why: S603/S607 (argument lists with fixed program names, no shell), S110 (best-effort cleanup), UP042 (str-mixin enums are relied on for their `str()` form), E501 (formatting is not enforced). Tests also ignore E402/E702/E731/B and F811 (fixtures imported by name).
+- **Security fixes found by the review (SECURITY.md section 7):** the unauthenticated BLE connection deadline is now measured from connect time (it was reset by every write); the Linux daemon no longer logs the SSID; secrets are `repr=False` in the Python dataclasses.
+- **`tools/attack_probe.py`** performs replay, stale-timestamp, tamper, wrong-version, silent-peer and lockout checks against a real phone; its logic is tested against the in-memory phone (`tests/test_attack_probe.py`). It is not shipped in the installed package.
+- **CI** (`.github/workflows/ci.yml`): Python 3.11 to 3.13 (ruff, mypy, pytest, `gen_vectors.py --check`) and one Gradle job (JDK 21, `test lintDebug assembleDebug`, APKs and reports as artifacts). It has not run on GitHub yet; the same commands were run locally (Python 3.11 and 3.14, Gradle 8.14.3).
+- **Vectors:** both languages now also check the UUIDs, protocol version, advertisement window, QR raw bytes (Python) and HKDF transcript (Python); the only vector keys not asserted anywhere are `_comment` and container keys.
+
 ## Dependencies and licenses
 
 | Dependency | Where | License | Status |
@@ -165,6 +173,8 @@ Same rules as the Linux client (D33 to D35): a dropped BLE link restarts with a 
 | `keyring` | linux-client optional extra | MIT | used (optional) |
 | `secretstorage` | via `keyring` on Linux (transitive) | BSD-3-Clause | transitive, optional |
 | `pytest` | linux-client dev only | MIT | dev only |
+| `ruff`, `mypy` | linux-client dev and CI only | MIT | dev only |
+| `actions/checkout`, `setup-python`, `setup-java`, `upload-artifact`, `gradle/actions/setup-gradle`, `android-actions/setup-android` | CI only (not shipped) | MIT / Apache-2.0 | CI only |
 | `zbarimg` (ZBar) | external CLI for QR images, not linked | LGPL-2.1 | optional external tool |
 | Android platform APIs | apps | n/a (AOSP, Apache-2.0) | no Google Play Services |
 | `kotlinx-coroutines` (core, android; test for `:common`) | `:common`, `:phone-app` | Apache-2.0 | used |
