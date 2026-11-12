@@ -152,7 +152,7 @@ Same rules as the Linux client (D33 to D35): a dropped BLE link restarts with a 
 - **Security fixes found by the review (SECURITY.md section 7):** the unauthenticated BLE connection deadline is now measured from connect time (it was reset by every write); the Linux daemon no longer logs the SSID; secrets are `repr=False` in the Python dataclasses.
 - **`tools/attack_probe.py`** performs replay, stale-timestamp, tamper, wrong-version, silent-peer and lockout checks against a real phone; its logic is tested against the in-memory phone (`tests/test_attack_probe.py`). It is not shipped in the installed package.
 - **CI** (`.github/workflows/ci.yml`): Python 3.11 to 3.13 (ruff, mypy, pytest, `gen_vectors.py --check`) and one Gradle job (JDK 21, `test lintDebug assembleDebug`, APKs and reports as artifacts). It has not run on GitHub yet; the same commands were run locally (Python 3.11 and 3.14, Gradle 8.14.3).
-- **Vectors:** both languages now also check the UUIDs, protocol version, advertisement window, QR raw bytes (Python) and HKDF transcript (Python); the only vector keys not asserted anywhere are `_comment` and container keys.
+- **Vectors:** both languages now also check the UUIDs, protocol version, advertisement window, QR raw bytes (Python) and HKDF transcript (Python). A key-name scan still shows a few vector keys that no test names literally (`ciphertext_and_tag`, `expected`, `request`, `response`, `status`, `service`-style nested names); they may be read through helper paths, but this was not checked key by key.
 
 ## Dependencies and licenses
 
