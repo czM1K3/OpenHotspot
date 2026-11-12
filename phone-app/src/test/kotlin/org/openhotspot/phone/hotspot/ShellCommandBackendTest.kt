@@ -63,8 +63,11 @@ class ShellCommandBackendTest {
     @Test fun probeChecksThatStartSoftapExists() = runTest {
         val ok = make(FakeShell { ShellResult(0, help12, "") }).probe()
         assertTrue(assertIs<ProbeResult.Available>(ok).detail.contains("wpa3 supported"))
-        val missing = assertIs<ProbeResult.Unavailable>(make(FakeShell { ShellResult(0, "some other help", "") }).probe())
+        val missing = assertIs<ProbeResult.Unavailable>(make(FakeShell { ShellResult(0, "Wi-Fi (wifi) commands:\n  get-country-code\n  start-lohs <ssid>\n", "") }).probe())
         assertEquals(FailureKind.UNSUPPORTED, missing.kind)
+        assertTrue("get-country-code start-lohs" in missing.reason, "the reason must list what cmd wifi does offer")
+        // help printed on stderr is found too
+        assertIs<ProbeResult.Available>(make(FakeShell { ShellResult(255, "", help12) }).probe())
         // Android 17 prints the help and exits 255: that must still count as available.
         assertIs<ProbeResult.Available>(make(FakeShell { ShellResult(255, help12, "") }).probe())
         val broken = assertIs<ProbeResult.Unavailable>(make(FakeShell { ShellResult(1, "", "cmd: Can't find service: wifi") }).probe())

@@ -98,12 +98,18 @@ class ShellCommandBackend(
         }
         return try {
             val r = shell.run(listOf("cmd", "wifi", "help"), 8_000)
-            // 'cmd wifi help' prints the help text but exits 255 on Android 17 (seen on device), so judge by the output, not the exit code.
+            // 'cmd wifi help' prints the help text but exits 255 on Android 17 (seen on device), so judge by the output,
+            // not the exit code. Help may go to stdout or stderr, so look at both.
+            val help = r.stdout + "\n" + r.stderr
             when {
-                r.stdout.isBlank() -> ProbeResult.Unavailable(FailureKind.API_UNAVAILABLE, "'cmd wifi help' printed nothing (exit ${r.exitCode}): ${Redactor.redact(r.stderr, emptyList(), 160)}")
-                !r.stdout.contains("start-softap") -> ProbeResult.Unavailable(FailureKind.UNSUPPORTED, "'cmd wifi help' does not list start-softap")
+                help.isBlank() -> ProbeResult.Unavailable(FailureKind.API_UNAVAILABLE, "'cmd wifi help' printed nothing (exit ${r.exitCode})")
+                !help.contains("start-softap") -> ProbeResult.Unavailable(
+                    FailureKind.UNSUPPORTED,
+                    "'cmd wifi help' (exit ${r.exitCode}, ${help.length} chars, stdout ${r.stdout.length}) does not list start-softap; " +
+                        "commands it lists: ${ShellCommands.commandNames(help)}",
+                )
                 else -> ProbeResult.Available(
-                    "cmd wifi lists start-softap" + (if (supportsWpa3(r.stdout)) " (wpa3 supported)" else " (wpa2 only)") +
+                    "cmd wifi lists start-softap" + (if (supportsWpa3(help)) " (wpa3 supported)" else " (wpa2 only)") +
                         "; may not share internet on every Android version",
                 )
             }
@@ -162,6 +168,12 @@ class ShellCommandBackend(
 /** Pure command construction and output parsing (unit-tested). */
 object ShellCommands {
     val STOP_SOFTAP = listOf("cmd", "wifi", "stop-softap")
+
+    /** Command names in a `cmd` help text (lines indented by two spaces), for diagnostics. Secret-free. */
+    fun commandNames(help: String, maxLen: Int = 700): String =
+        Regex("(?m)^ {1,4}([a-z][a-z0-9-]+)").findAll(help).map { it.groupValues[1] }.distinct().joinToString(" ").let {
+            if (it.length > maxLen) it.take(maxLen) + "…" else it
+        }
 
     enum class Outcome { SUCCEEDED, FAILED, UNKNOWN }
 
