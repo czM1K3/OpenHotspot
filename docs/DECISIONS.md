@@ -99,6 +99,9 @@ The user asked for the local-only fallback. It is allowed by default, loudly lab
 ## D30. Auto-off and credential rules
 Auto-off: shorter of client request and user setting wins; unknown client count means no auto-off. Credentials: the tethering backend reports the saved system config (what the OS actually starts), the shell backend the user entry. User-entered passphrases are stored Keystore-encrypted. The log and diagnostics export never contain SSIDs or passphrases (`Redactor`, only lengths in test steps).
 
+## D31. Shell backend is dead on Android 17 with adb-mode Shizuku; kept as a root-mode fallback
+Device test (Nothing A059, Android 17): `cmd wifi start-softap` and `stop-softap` throw `SecurityException: Uid 2000 does not have access`. The TetheringManager backend works and local-only works. The shell backend is kept (it may work on older versions or with root-mode Shizuku, unverified) but the probe now reports the refusal, so it is never selected on this phone.
+
 ## Dependencies and licenses
 
 | Dependency | Where | License | Status |

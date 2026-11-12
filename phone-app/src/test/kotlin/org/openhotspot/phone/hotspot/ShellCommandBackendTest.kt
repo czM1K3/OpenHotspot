@@ -71,6 +71,9 @@ class ShellCommandBackendTest {
         // Help truncated before start-softap (seen on Android 17), but the command exists: a bare call fails on the missing argument.
         val truncated = make(FakeShell { a -> if (a.size == 2 + 1 && a[2] == "start-softap") ShellResult(255, "", "Exception occurred while executing 'start-softap':\njava.lang.IllegalArgumentException: Argument expected") else ShellResult(255, helpWithoutIt, "") })
         assertTrue(assertIs<ProbeResult.Available>(truncated.probe()).detail.contains("start-softap exists"))
+        // Android 17 on the Nothing A059: the command is refused for uid 2000, so it must NOT be reported as available.
+        val refused = make(FakeShell { a -> if (a.size == 3 && a[2] == "start-softap") ShellResult(255, "", "Exception occurred while executing 'start-softap':\njava.lang.SecurityException: Uid 2000 does not have access to start-softap wifi command (or such command doesn't exist)") else ShellResult(255, helpWithoutIt, "") })
+        assertEquals(FailureKind.PERMISSION_DENIED, assertIs<ProbeResult.Unavailable>(refused.probe()).kind)
         // help printed on stderr is found too
         assertIs<ProbeResult.Available>(make(FakeShell { ShellResult(255, "", help12) }).probe())
         // Android 17 prints the help and exits 255: that must still count as available.

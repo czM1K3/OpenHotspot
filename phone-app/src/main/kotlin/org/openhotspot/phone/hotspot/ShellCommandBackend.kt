@@ -168,6 +168,14 @@ class ShellCommandBackend(
     private suspend fun probeByCall(helpResult: ShellResult, help: String): ProbeResult {
         val r = shell.run(listOf("cmd", "wifi", "start-softap"), 8_000)
         val out = r.stdout + "\n" + r.stderr
+        // Android 17 (Nothing OS 5.0): the command exists but is refused for the shell UID, which is also why the help omits it.
+        if (out.contains("does not have access to")) {
+            return ProbeResult.Unavailable(
+                FailureKind.PERMISSION_DENIED,
+                "Android refuses 'cmd wifi start-softap' for this Shizuku identity (" + Redactor.redact(out.substringAfter("SecurityException:"), emptyList(), 110) +
+                    "); only a root-mode Shizuku could use it",
+            )
+        }
         val unknown = out.contains("Wi-Fi (wifi) commands") || out.isBlank()
         return if (unknown) {
             ProbeResult.Unavailable(
