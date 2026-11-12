@@ -83,7 +83,7 @@ class InMemoryConnection(Connection):
             raise TransportError("connection closed by the phone")
         try:
             return await asyncio.wait_for(self._queue.get(), timeout)
-        except asyncio.TimeoutError as exc:
+        except TimeoutError as exc:
             raise TransportTimeout("no response notification before the timeout") from exc
 
     async def read_status(self) -> bytes:

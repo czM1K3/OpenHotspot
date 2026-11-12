@@ -1,5 +1,6 @@
 package org.openhotspot.tablet.service
 
+import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.content.Intent
 import android.graphics.drawable.Icon
@@ -58,6 +59,7 @@ class ConnectTileService : TileService() {
             startActivityAndCollapse(PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT))
         } else {
             @Suppress("DEPRECATION")
+            @SuppressLint("StartActivityAndCollapseDeprecated") // guarded: only runs below API 34
             startActivityAndCollapse(intent)
         }
     }

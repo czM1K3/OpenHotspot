@@ -216,7 +216,7 @@ class BleakTransport(Transport):
             bluez["adapter"] = self.adapter
         if passive:
             bluez["or_patterns"] = [OrPattern(0, AdvertisementDataType.SERVICE_DATA_UUID128, SERVICE_UUID_BYTES[::-1])]
-        return BleakScanner(callback, scanning_mode="passive" if passive else "active", bluez=bluez)
+        return BleakScanner(callback, scanning_mode="passive" if passive else "active", bluez=bluez)  # type: ignore[arg-type]
 
     def _default_client(self, target: Any, disconnected_callback: Callable[[Any], None], timeout: float) -> Any:
         kwargs: dict[str, Any] = {"disconnected_callback": disconnected_callback, "timeout": timeout}
@@ -256,7 +256,7 @@ class BleakTransport(Transport):
         try:
             try:
                 await asyncio.wait_for(event.wait(), timeout)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 pass
         finally:
             try:
@@ -274,9 +274,14 @@ class BleakTransport(Transport):
             client = None
             try:
                 holder: list[BleakConnection] = []
+
+                def on_drop(c: Any, holder: list[BleakConnection] = holder) -> None:
+                    if holder:
+                        holder[0].on_disconnect(c)
+
                 client = self._client_factory(
                     self._seen.get(adv.address, adv.address),
-                    disconnected_callback=lambda c: holder and holder[0].on_disconnect(c),
+                    disconnected_callback=on_drop,
                     timeout=self.connect_timeout,
                 )
                 await asyncio.wait_for(client.connect(), self.connect_timeout + 5)

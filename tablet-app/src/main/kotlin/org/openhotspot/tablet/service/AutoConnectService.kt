@@ -7,7 +7,6 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
-import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
@@ -32,7 +31,7 @@ class AutoConnectService : LifecycleService() {
             NotificationChannel(CHANNEL_ID, getString(R.string.channel_name), NotificationManager.IMPORTANCE_LOW),
         )
         try {
-            val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE else 0
+            val type = ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
             ServiceCompat.startForeground(this, NOTIFICATION_ID, notification(), type)
         } catch (e: Exception) { // missing Bluetooth permission on API 34+, or a background-start restriction
             Log.w(TAG, "Could not start in the foreground (${e.javaClass.simpleName}); open the app and re-enable auto-connect")

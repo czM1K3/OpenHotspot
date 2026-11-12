@@ -2,9 +2,9 @@ import subprocess
 
 import pytest
 
-from openhotspot.daemon import Activity, Daemon, Mode
 from openhotspot.config import Config
-from openhotspot.doctor import FAIL, OK, WARN, run_checks, format_checks
+from openhotspot.daemon import Activity, Daemon, Mode
+from openhotspot.doctor import FAIL, OK, WARN, format_checks, run_checks
 from openhotspot.storage import FileKeyStore
 from openhotspot.tray import COLORS, TrayModel
 

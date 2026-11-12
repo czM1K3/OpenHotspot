@@ -49,7 +49,7 @@ private class MlKitQrAnalyzer(private val gate: QrGate) : ImageAnalysis.Analyzer
  * analyzer are released when the composable leaves the screen.
  */
 @Composable
-fun CameraQrScanner(gate: QrGate, modifier: Modifier = Modifier.fillMaxSize(), onCameraError: (String) -> Unit = {}) {
+fun CameraQrScanner(gate: QrGate, modifier: Modifier = Modifier, onCameraError: (String) -> Unit = {}) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val executor: ExecutorService = remember { Executors.newSingleThreadExecutor() }

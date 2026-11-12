@@ -4,7 +4,7 @@ from openhotspot.chunking import Reassembler, chunk_frame
 from openhotspot.constants import Band, ErrorCode, HotspotState, MsgType, Security
 from openhotspot.errors import ProtocolError
 from openhotspot.framing import Frame
-from openhotspot.messages import HotspotInfo, Status, unpack_enable_body, pack_enable_body
+from openhotspot.messages import HotspotInfo, Status, pack_enable_body, unpack_enable_body
 
 
 def code_of(exc_info) -> ErrorCode:

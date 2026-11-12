@@ -1,5 +1,4 @@
 """BleakTransport against a fake bleak/BlueZ stack. Real BlueZ behaviour is in docs/TESTING.md."""
-import asyncio
 
 import pytest
 from bleak.exc import (
@@ -165,7 +164,7 @@ async def test_fatal_connect_error_is_not_retried(transport, ble):
 
 
 async def test_connect_timeout_is_a_retryable_bluetooth_error(transport, ble):
-    ble.connect_errors = [asyncio.TimeoutError()]
+    ble.connect_errors = [TimeoutError()]
     await transport.connect(Advertisement("A", b""))
     assert ble.connect_calls == 2
 
@@ -234,7 +233,7 @@ async def test_close_is_quiet_when_bluez_is_already_gone(transport, ble):
     (BleakError("Bleak requires BlueZ >= 5.55."), "Upgrade BlueZ", False),
     (FileNotFoundError(), "system D-Bus", False),
     (PermissionError(), "permission denied", False),
-    (asyncio.TimeoutError(), "timed out", True),
+    (TimeoutError(), "timed out", True),
 ])
 def test_translate_error(exc, needle, retryable):
     out = translate_error(exc)

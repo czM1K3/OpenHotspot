@@ -1,5 +1,6 @@
 package org.openhotspot.tablet.perm
 
+import android.annotation.SuppressLint
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
@@ -15,6 +16,7 @@ import androidx.core.content.ContextCompat
  * - API 33+: NEARBY_WIFI_DEVICES for Wi-Fi requests and POST_NOTIFICATIONS for the service notice.
  * - CAMERA only for pairing.
  */
+@SuppressLint("InlinedApi") // every use is behind an sdkInt parameter
 object Permissions {
     fun bluetooth(sdkInt: Int): List<String> = when {
         sdkInt >= Build.VERSION_CODES.S -> listOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT)

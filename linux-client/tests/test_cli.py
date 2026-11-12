@@ -4,14 +4,14 @@ import pytest
 
 from openhotspot.cli import Deps, main
 from openhotspot.config import Config, ConnectConfig
-from openhotspot.doctor import Check
-from openhotspot.state import StateFile
 from openhotspot.connectivity import Connectivity, ConnectivityChecker
 from openhotspot.constants import Security
+from openhotspot.doctor import Check
+from openhotspot.errors import WifiError
+from openhotspot.state import StateFile
 from openhotspot.storage import FileKeyStore
 from openhotspot.transport import InMemoryTransport
 from openhotspot.wifi import WifiConnector
-from openhotspot.errors import WifiError
 from tests.fake_phone import FakePhone
 
 

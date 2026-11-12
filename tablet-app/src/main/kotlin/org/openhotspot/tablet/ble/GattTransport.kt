@@ -1,5 +1,6 @@
 package org.openhotspot.tablet.ble
 
+import android.bluetooth.BluetoothStatusCodes
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
@@ -211,7 +212,7 @@ private class GattLink(private val context: Context, private val device: Bluetoo
     @Suppress("DEPRECATION")
     private fun writeCccd(g: BluetoothGatt, cccd: BluetoothGattDescriptor): Boolean =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            g.writeDescriptor(cccd, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE) == BluetoothGatt.GATT_SUCCESS
+            g.writeDescriptor(cccd, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE) == BluetoothStatusCodes.SUCCESS
         } else {
             cccd.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
             g.writeDescriptor(cccd)
@@ -224,7 +225,7 @@ private class GattLink(private val context: Context, private val device: Bluetoo
         val done = CompletableDeferred<Int>()
         pendingWrite = done
         val started = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            g.writeCharacteristic(c, chunk, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT) == BluetoothGatt.GATT_SUCCESS
+            g.writeCharacteristic(c, chunk, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT) == BluetoothStatusCodes.SUCCESS
         } else {
             c.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT // Write With Response, as the protocol requires
             c.value = chunk

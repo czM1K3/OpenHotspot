@@ -44,7 +44,10 @@ android {
 
 kotlin {
     jvmToolchain(21)
-    compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) }
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+        optIn.add("kotlinx.coroutines.ExperimentalCoroutinesApi") // runTest/TestScope in tests
+    }
 }
 
 dependencies {

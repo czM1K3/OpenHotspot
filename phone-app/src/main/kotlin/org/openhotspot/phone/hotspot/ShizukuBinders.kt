@@ -2,7 +2,6 @@ package org.openhotspot.phone.hotspot
 
 import android.content.Context
 import android.content.ContextWrapper
-import android.os.Build
 import android.os.IBinder
 import java.lang.reflect.InvocationTargetException
 import org.lsposed.hiddenapibypass.HiddenApiBypass
@@ -30,8 +29,7 @@ object ShizukuBinders {
     fun ensureHiddenApiAccess(): Boolean {
         if (exemptionsTried) return exemptionsOk
         exemptionsTried = true
-        exemptionsOk = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) true // no enforcement before Android 9
-        else try {
+        exemptionsOk = try { // minSdk 30: hidden-API enforcement always applies
             HiddenApiBypass.addHiddenApiExemptions("Landroid/net/", "Landroid/os/ServiceManager")
         } catch (e: Throwable) {
             false

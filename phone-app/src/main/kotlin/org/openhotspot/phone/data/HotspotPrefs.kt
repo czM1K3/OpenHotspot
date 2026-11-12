@@ -1,5 +1,6 @@
 package org.openhotspot.phone.data
 
+import androidx.core.content.edit
 import android.content.Context
 import android.util.Base64
 import java.io.ByteArrayInputStream
@@ -25,11 +26,11 @@ class HotspotPrefs(context: Context, private val cipher: SecretCipher, private v
 
     var autoOffMinutesSetting: Int
         get() = prefs.getInt("auto_off_minutes", DEFAULT_AUTO_OFF_MINUTES)
-        set(v) = prefs.edit().putInt("auto_off_minutes", v.coerceIn(0, MAX_AUTO_OFF_MINUTES)).apply()
+        set(v) = prefs.edit { putInt("auto_off_minutes", v.coerceIn(0, MAX_AUTO_OFF_MINUTES)) }
 
     var allowLocalOnlySetting: Boolean
         get() = prefs.getBoolean("allow_local_only", true)
-        set(v) = prefs.edit().putBoolean("allow_local_only", v).apply()
+        set(v) = prefs.edit { putBoolean("allow_local_only", v) }
 
     override fun autoOffMinutes() = autoOffMinutesSetting
     override fun allowLocalOnly() = allowLocalOnlySetting
@@ -50,14 +51,14 @@ class HotspotPrefs(context: Context, private val cipher: SecretCipher, private v
         val creds = HotspotCredentials(ssid.toByteArray(Charsets.UTF_8), passphrase, security, Band.UNKNOWN, CredentialSource.USER)
         return try {
             val blob = Base64.encodeToString(cipher.encrypt(encode(creds), AAD), Base64.NO_WRAP)
-            prefs.edit().putString("user_credentials", blob).commit()
+            prefs.edit(commit = true) { putString("user_credentials", blob) } // synchronous: credentials must be durable
             null
         } catch (e: Exception) {
             "Could not store the credentials securely (${e.javaClass.simpleName})"
         }
     }
 
-    fun clearUserCredentials() { prefs.edit().remove("user_credentials").apply() }
+    fun clearUserCredentials() { prefs.edit { remove("user_credentials") } }
 
     private fun encode(c: HotspotCredentials): ByteArray {
         val bos = ByteArrayOutputStream()

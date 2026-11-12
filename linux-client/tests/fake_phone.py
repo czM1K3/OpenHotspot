@@ -6,12 +6,11 @@ the hotspot state machine and advertisements. It satisfies ``openhotspot.transpo
 """
 from __future__ import annotations
 
-import hmac
 import hashlib
 import struct
 from collections import deque
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from openhotspot import advertisement, crypto
 from openhotspot.advertisement import Advertisement

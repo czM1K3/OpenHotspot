@@ -96,7 +96,7 @@ fun PairScreen(onClose: () -> Unit) {
                     OutlinedTextField(label, { label = it.take(32) }, label = { Text("Name shown on the phone for this tablet") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                     if (cameraPresent && granted) {
                         Box(Modifier.fillMaxWidth().height(360.dp)) {
-                            CameraQrScanner(gate, onCameraError = { scanHint = it })
+                            CameraQrScanner(gate, Modifier.fillMaxSize(), onCameraError = { scanHint = it })
                         }
                     } else {
                         if (cameraPresent) Text("Camera and Bluetooth access are needed to scan and pair.") else Text("This tablet has no camera. Paste the pairing link instead.")

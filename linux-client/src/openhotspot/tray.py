@@ -10,6 +10,7 @@ import logging
 import signal
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import partial
 
 from .daemon import Activity, Daemon, Mode
 from .errors import OpenHotspotError
@@ -62,7 +63,7 @@ class TrayModel:
         ]
         for mode, label in ((Mode.AUTO, "Auto: connect by itself"), (Mode.MANUAL, "Manual: only notify"),
                             (Mode.OFF, "Off")):
-            items.append(MenuEntry(label, (lambda m=mode: d.set_mode(m)), checked=d.mode == mode))
+            items.append(MenuEntry(label, partial(d.set_mode, mode), checked=d.mode == mode))
         items.append(MenuEntry("Quit", self._quit))
         return items
 
@@ -90,7 +91,13 @@ def run_tray(daemon: Daemon) -> None:  # pragma: no cover - needs a graphical se
         ) from exc
 
     holder: list = []
-    model = TrayModel(daemon, lambda: (daemon.stop(), holder and holder[0].stop()))
+
+    def self_stop() -> None:
+        daemon.stop()
+        if holder:
+            holder[0].stop()
+
+    model = TrayModel(daemon, self_stop)
 
     def action_for(fn: Callable[[], None] | None):
         return (lambda icon, item: fn()) if fn else (lambda icon, item: None)  # pystray counts parameters
@@ -98,7 +105,7 @@ def run_tray(daemon: Daemon) -> None:  # pragma: no cover - needs a graphical se
     def checked_for(value: bool | None):
         return None if value is None else (lambda item: value)
 
-    def build_menu() -> "pystray.Menu":
+    def build_menu() -> pystray.Menu:
         return pystray.Menu(*[
             pystray.MenuItem(e.label, action_for(e.action), checked=checked_for(e.checked),
                              radio=e.checked is not None, enabled=e.enabled)

@@ -1,5 +1,6 @@
 package org.openhotspot.phone.data
 
+import androidx.core.content.edit
 import android.content.Context
 import org.openhotspot.common.phone.RateLimitPersistence
 import org.openhotspot.common.phone.RateLimitSnapshot
@@ -11,11 +12,11 @@ class Settings(context: Context) {
     /** The user wants the service running (set by Start/Stop; survives process death and reboot). */
     var serviceEnabled: Boolean
         get() = prefs.getBoolean("service_enabled", false)
-        set(v) = prefs.edit().putBoolean("service_enabled", v).apply()
+        set(v) = prefs.edit { putBoolean("service_enabled", v) }
 
     var startOnBoot: Boolean
         get() = prefs.getBoolean("start_on_boot", true)
-        set(v) = prefs.edit().putBoolean("start_on_boot", v).apply()
+        set(v) = prefs.edit { putBoolean("start_on_boot", v) }
 }
 
 /** Keeps the lockout state across restarts (SECURITY.md section 3). Contains no secrets. */
@@ -28,7 +29,9 @@ class RateLimitPrefs(context: Context) : RateLimitPersistence {
         ) else null
 
     override fun save(snapshot: RateLimitSnapshot) {
-        prefs.edit().putInt("level", snapshot.level).putLong("locked_until", snapshot.lockedUntilMs)
-            .putLong("last_failure", snapshot.lastFailureMs).commit() // synchronous: must survive a kill
+        // commit = true: synchronous, the lockout must survive a process kill.
+        prefs.edit(commit = true) {
+            putInt("level", snapshot.level).putLong("locked_until", snapshot.lockedUntilMs).putLong("last_failure", snapshot.lastFailureMs)
+        }
     }
 }

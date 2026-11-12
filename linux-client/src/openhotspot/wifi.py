@@ -124,7 +124,7 @@ class NmcliConnector(WifiConnector):
         return deleted
 
     @staticmethod
-    def _plain_error(result: "subprocess.CompletedProcess[str]", prefix: str) -> str:
+    def _plain_error(result: subprocess.CompletedProcess[str], prefix: str) -> str:
         text = (result.stderr or result.stdout or "").strip()
         low = text.lower()
         hint = next((h for needle, h in _NM_HINTS if needle in low), "")
@@ -139,7 +139,7 @@ class NmcliConnector(WifiConnector):
         # A profile left from an earlier session may hold an old passphrase: always start clean.
         self._delete_profiles(only=name)
 
-        def attempt(hidden: bool) -> "subprocess.CompletedProcess[str]":
+        def attempt(hidden: bool) -> subprocess.CompletedProcess[str]:
             argv = ["nmcli", "--wait", "30", "device", "wifi", "connect", text, "password", passphrase, "name", name]
             if hidden:
                 argv += ["hidden", "yes"]

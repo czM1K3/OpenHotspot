@@ -14,12 +14,12 @@ from dataclasses import dataclass
 from . import crypto
 from .constants import (
     MAX_LABEL_BYTES,
-    ErrorCode,
     QR_PREFIX,
     QR_RAW_LEN,
     SERVICE_UUID_BYTES,
     TIMESTAMP_SKEW_MS,
     VERSION,
+    ErrorCode,
     MsgType,
 )
 from .errors import AuthenticationError, PairingError, PhoneError, ProtocolError

@@ -1,4 +1,5 @@
 import re
+
 """Daemon logic with a fake phone, fake network state and a fake clock (no BLE, no NetworkManager)."""
 import asyncio
 
@@ -6,7 +7,7 @@ import pytest
 
 from openhotspot.config import Config, ConnectConfig, DaemonConfig, parse_config
 from openhotspot.connectivity import Connectivity, ConnectivityChecker
-from openhotspot.constants import ErrorCode, Security
+from openhotspot.constants import Security
 from openhotspot.daemon import Activity, Daemon, Mode
 from openhotspot.errors import BluetoothError, WifiError
 from openhotspot.notify import Notifier

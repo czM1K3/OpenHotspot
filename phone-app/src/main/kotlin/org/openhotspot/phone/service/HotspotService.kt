@@ -7,7 +7,6 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
-import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
@@ -29,7 +28,7 @@ class HotspotService : LifecycleService() {
         val g = graph
         createChannel()
         try {
-            val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE else 0
+            val type = ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
             ServiceCompat.startForeground(this, NOTIFICATION_ID, notification(), type)
         } catch (e: Exception) { // e.g. missing Bluetooth permission on API 34+, or background-start restriction
             g.log.add(LogLevel.ERROR, "Could not start in the foreground (${e.javaClass.simpleName}); grant permissions and start from the app")

@@ -7,6 +7,7 @@ import urllib.request
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
 from enum import Enum
+from typing import Any
 
 
 class Connectivity(Enum):
@@ -48,7 +49,7 @@ class NmConnectivity(ConnectivityChecker):
     """`nmcli general` state for polling; `nmcli networking connectivity check` (NetworkManager's own
     probe) when ``probe`` is set; if ``probe_url`` is given, that URL must also answer with 2xx."""
 
-    def __init__(self, runner: Runner = _run, probe_url: str = "", opener: Callable[..., object] | None = None) -> None:
+    def __init__(self, runner: Runner = _run, probe_url: str = "", opener: Callable[..., Any] | None = None) -> None:
         self._run, self._url = runner, probe_url
         self._open = opener or urllib.request.urlopen
 
@@ -60,9 +61,11 @@ class NmConnectivity(ConnectivityChecker):
         return res.stdout.strip().lower() if res.returncode == 0 else None
 
     def _http_ok(self) -> bool:
+        if not self._url.lower().startswith(("http://", "https://")):
+            return False  # never open file: or custom schemes from a config value
         try:
-            with self._open(urllib.request.Request(self._url, headers={"User-Agent": "openhotspot"}), timeout=8) as r:  # type: ignore[operator]
-                return 200 <= r.status < 300  # type: ignore[attr-defined]
+            with self._open(urllib.request.Request(self._url, headers={"User-Agent": "openhotspot"}), timeout=8) as r:  # noqa: S310 (http/https only, checked above)
+                return 200 <= r.status < 300
         except (urllib.error.URLError, OSError, ValueError):
             return False
 

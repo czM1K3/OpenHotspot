@@ -1,5 +1,7 @@
 package org.openhotspot.phone.ui
 
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import android.app.Activity
 import android.view.WindowManager
 import androidx.compose.foundation.Canvas
@@ -54,10 +56,10 @@ fun PairingScreen(modifier: Modifier = Modifier, active: Boolean) {
     val clients by graph.store.clients.collectAsState()
     val status by graph.serviceStatus.collectAsState()
     var qr by remember { mutableStateOf<String?>(null) }
-    var remainingS by remember { mutableStateOf(0L) }
+    var remainingS by remember { mutableLongStateOf(0L) }
     var pendingRevoke by remember { mutableStateOf<ClientRecord?>(null) }
     var justPaired by remember { mutableStateOf<String?>(null) }
-    var knownCount by remember { mutableStateOf(clients.size) }
+    var knownCount by remember { mutableIntStateOf(clients.size) }
 
     // The pairing window only stays open while this screen is in the foreground (PROTOCOL.md 4.2).
     fun close() { engine.closePairing(); qr = null }

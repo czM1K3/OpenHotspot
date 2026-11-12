@@ -1,5 +1,6 @@
 package org.openhotspot.tablet.data
 
+import androidx.core.content.edit
 import android.content.Context
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -56,10 +57,10 @@ class PrefsSettings(context: Context) : SettingsStore {
     @Synchronized
     override fun update(change: (AppSettings) -> AppSettings) {
         val s = change(flow.value)
-        prefs.edit()
-            .putString("join", s.joinMethod.name).putBoolean("hidden", s.hiddenSsid)
-            .putBoolean("auto", s.autoEnabled).putInt("cooldown", s.cooldownSeconds)
-            .apply()
+        prefs.edit {
+            putString("join", s.joinMethod.name).putBoolean("hidden", s.hiddenSsid)
+            putBoolean("auto", s.autoEnabled).putInt("cooldown", s.cooldownSeconds)
+        }
         flow.value = s
     }
 }

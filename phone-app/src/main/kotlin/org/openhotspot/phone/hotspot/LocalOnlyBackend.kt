@@ -94,6 +94,7 @@ class LocalOnlyBackend(private val context: Context, private val log: EngineLog 
         return credentialsOf(outcome.getOrThrow())
     }
 
+    @Suppress("DEPRECATION") // SoftApConfiguration.ssid: the fallback below API 33, where wifiSsid does not exist
     private fun credentialsOf(r: WifiManager.LocalOnlyHotspotReservation): HotspotCredentials {
         val cfg: SoftApConfiguration = r.softApConfiguration
         val ssid = (if (Build.VERSION.SDK_INT >= 33) cfg.wifiSsid?.bytes else null) ?: cfg.ssid?.toByteArray(Charsets.UTF_8)

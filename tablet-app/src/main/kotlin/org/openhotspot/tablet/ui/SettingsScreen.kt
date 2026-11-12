@@ -1,5 +1,6 @@
 package org.openhotspot.tablet.ui
 
+import androidx.core.net.toUri
 import android.app.StatusBarManager
 import android.content.ComponentName
 import android.graphics.drawable.Icon
@@ -109,7 +110,7 @@ fun SettingsScreen() {
         Text(if (ignoring) "Battery optimisation is off for this app." else "Auto-connect can be delayed or stopped by battery optimisation. Samsung tablets are strict about this (SETUP.md).")
         if (!ignoring) {
             Button(onClick = {
-                ctx.startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:${ctx.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                ctx.startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, "package:${ctx.packageName}".toUri()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             }) { Text("Allow background use") }
         }
         message?.let { Text(it, color = MaterialTheme.colorScheme.error) }
