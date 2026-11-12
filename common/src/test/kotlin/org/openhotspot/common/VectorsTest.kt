@@ -34,6 +34,16 @@ class VectorsTest {
         assertContentEquals(q.hex("raw"), byteArrayOf(1) + qr.serviceUuid + qr.phonePub + qr.secret)
     }
 
+    @Test fun uuidsAndVersionMatchTheVectors() {
+        val u = obj("uuids")
+        assertEquals(u.str("service"), Proto.SERVICE_UUID)
+        assertEquals(u.str("request"), Proto.CHAR_REQUEST_UUID)
+        assertEquals(u.str("response"), Proto.CHAR_RESPONSE_UUID)
+        assertEquals(u.str("status"), Proto.CHAR_STATUS_UUID)
+        assertEquals(v.get("protocol_version").asInt, Proto.VERSION)
+        assertEquals(obj("advertisement").get("window_seconds").asLong, 300L)
+    }
+
     @Test fun qrRejectsGarbage() {
         listOf("nope", "openhotspot://pair/AAAA", "openhotspot://pair/!!!").forEach {
             assertFailsWith<PairingException> { PairingQr.parse(it) }

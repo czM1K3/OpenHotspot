@@ -53,6 +53,21 @@ def test_vector_qr(vectors):
     assert crypto.x25519_public(H(vectors["qr"]["phone_private"])) == qr.phone_pub
 
 
+def test_vector_uuids_version_and_qr_raw(vectors):
+    from openhotspot import constants
+
+    u = vectors["uuids"]
+    assert (u["service"], u["request"], u["response"], u["status"]) == (
+        constants.SERVICE_UUID, constants.CHAR_REQUEST_UUID, constants.CHAR_RESPONSE_UUID, constants.CHAR_STATUS_UUID)
+    assert vectors["protocol_version"] == constants.VERSION
+    assert vectors["advertisement"]["window_seconds"] == 300
+    qr = PairingQr.parse(vectors["qr"]["uri"])
+    assert bytes([1]) + qr.service_uuid + qr.phone_pub + qr.secret == H(vectors["qr"]["raw"])
+    kd = vectors["key_derivation"]
+    client_pub = crypto.x25519_public(H(kd["client_private"]))
+    assert constants.SERVICE_UUID_BYTES + qr.phone_pub + client_pub == H(kd["hkdf_info_transcript"])
+
+
 def test_vector_key_derivation(vectors):
     qr = PairingQr.parse(vectors["qr"]["uri"])
     kd = vectors["key_derivation"]
