@@ -103,6 +103,7 @@ class ShellCommandBackend(
             val help = r.stdout + "\n" + r.stderr
             when {
                 help.isBlank() -> ProbeResult.Unavailable(FailureKind.API_UNAVAILABLE, "'cmd wifi help' printed nothing (exit ${r.exitCode})")
+                help.contains("Can't find service") -> ProbeResult.Unavailable(FailureKind.API_UNAVAILABLE, "cmd cannot find the wifi service: ${Redactor.redact(help, emptyList(), 120)}")
                 !help.contains("start-softap") -> ProbeResult.Unavailable(
                     FailureKind.UNSUPPORTED,
                     "'cmd wifi help' (exit ${r.exitCode}, ${help.length} chars, stdout ${r.stdout.length}) does not list start-softap; " +
