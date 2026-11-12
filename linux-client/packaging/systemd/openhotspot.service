@@ -1,0 +1,19 @@
+# OpenHotspot daemon (systemd user unit). Installed by packaging/install.sh into
+# ~/.config/systemd/user/. Use openhotspot-tray.service instead if you want the tray icon.
+[Unit]
+Description=OpenHotspot: turn on the paired phone's hotspot when this laptop is offline
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/openhotspot daemon
+# bluetoothd or NetworkManager may not be up yet at login, and Bluetooth can be switched off:
+# the daemon handles that itself, so this only covers real crashes.
+Restart=on-failure
+RestartSec=10
+Environment=PYTHONUNBUFFERED=1
+# Be polite: this is background housekeeping.
+Nice=10
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=default.target

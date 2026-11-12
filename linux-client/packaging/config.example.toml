@@ -1,0 +1,53 @@
+# OpenHotspot configuration: ~/.config/openhotspot/config.toml
+# Every key is optional; the values below are the defaults. Unknown keys are rejected so that
+# typos do not go unnoticed. Check the file with: openhotspot daemon --once --mode off
+
+# Phone id (a prefix is enough, see `openhotspot status`). Only needed if several phones are paired.
+phone = ""
+
+[daemon]
+# auto:   when this laptop has no internet and the paired phone is near, connect by itself
+# manual: never connect by itself; only send a desktop notice that the phone is near
+# off:    do nothing (the daemon idles)
+mode = "auto"
+
+# Power use. While the laptop is online the daemon does NOT scan at all, it only polls
+# NetworkManager's state every idle_interval_s. While offline it scans for scan_duration_s every
+# scan_interval_s (a duty cycle of about 10 % by default); the pause grows to max_scan_interval_s
+# while the phone stays away and resets as soon as it is seen.
+scan_interval_s = 60
+max_scan_interval_s = 300
+scan_duration_s = 6
+idle_interval_s = 30
+
+# After a successful connect do not trigger again for this long (avoids flapping), and after a
+# failed attempt (avoids hammering a phone that cannot start its hotspot).
+cooldown_s = 300
+failure_cooldown_s = 120
+# After `openhotspot disconnect` stay quiet this long, so a deliberate disconnect is respected.
+disconnect_pause_s = 3600
+# manual mode: at most one "phone nearby" notification per this long.
+manual_notify_interval_s = 1800
+
+[ble]
+# Bluetooth adapter, e.g. "hci1". Empty = BlueZ default.
+adapter = ""
+# Passive scanning uses a BlueZ advertisement monitor (lower radio use). It may need
+# `bluetoothd --experimental` on older BlueZ; if BlueZ refuses, scanning falls back to active.
+passive_scan = false
+connect_timeout_s = 15
+# Tries per request when the link drops or BlueZ is briefly busy.
+attempts = 2
+
+[connect]
+# Ask the phone to turn the hotspot off after this many seconds (0 = the phone's default).
+auto_off_s = 0
+# After joining, check that the internet works; if it does not, the daemon undoes the connection.
+verify = true
+verify_timeout_s = 30
+# Optional extra check: this URL must answer 2xx (plain HTTP, no redirects followed to login pages).
+probe_url = ""
+
+[notifications]
+# Desktop notifications through notify-send (silently skipped if it is not installed).
+enabled = true
