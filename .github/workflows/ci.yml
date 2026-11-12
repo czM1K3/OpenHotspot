@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: Linux client (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+    defaults:
+      run:
+        working-directory: linux-client
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: linux-client/pyproject.toml
+      - name: Install
+        run: python -m pip install -e '.[dev]'
+      - name: Lint (ruff)
+        run: ruff check src tests tools
+      - name: Type check (mypy)
+        run: mypy src
+      - name: Tests
+        run: python -m pytest -q
+      - name: Test vectors are up to date
+        working-directory: .
+        run: python docs/tools/gen_vectors.py --check
+
+  android:
+    name: Kotlin and Android (test, lint, assemble)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Unit tests, lint and debug APKs
+        run: ./gradlew --no-daemon --continue test lintDebug assembleDebug
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-reports
+          path: |
+            **/build/reports/tests/**
+            **/build/reports/lint-results-debug.html
+            **/build/test-results/**/*.xml
+          if-no-files-found: ignore
+      - name: Upload debug APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-apks
+          path: |
+            phone-app/build/outputs/apk/debug/*.apk
+            tablet-app/build/outputs/apk/debug/*.apk
