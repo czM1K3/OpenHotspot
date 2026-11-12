@@ -49,6 +49,7 @@ class ShellCommandBackendTest {
         assertEquals(ShellCommands.Outcome.FAILED, p("Soft AP failed to start. Please check config parameters"))
         assertEquals(ShellCommands.Outcome.FAILED, p("onStateChanged ... SAP failed to start"))
         assertEquals(ShellCommands.Outcome.FAILED, p("", code = 255))
+        assertEquals(ShellCommands.Outcome.SUCCEEDED, p("SAP is enabled successfully", code = 255), "text wins over a non-zero exit")
         assertEquals(ShellCommands.Outcome.UNKNOWN, p("onStateChanged with state: 11 SAP is disabled"))
         assertEquals(ShellCommands.Outcome.SUCCEEDED, ShellCommands.parseStop(ShellResult(0, "Soft AP stopped successfully", "")))
         assertEquals(ShellCommands.Outcome.FAILED, ShellCommands.parseStop(ShellResult(0, "Soft AP failed to stop", "")))
@@ -64,6 +65,8 @@ class ShellCommandBackendTest {
         assertTrue(assertIs<ProbeResult.Available>(ok).detail.contains("wpa3 supported"))
         val missing = assertIs<ProbeResult.Unavailable>(make(FakeShell { ShellResult(0, "some other help", "") }).probe())
         assertEquals(FailureKind.UNSUPPORTED, missing.kind)
+        // Android 17 prints the help and exits 255: that must still count as available.
+        assertIs<ProbeResult.Available>(make(FakeShell { ShellResult(255, help12, "") }).probe())
         val broken = assertIs<ProbeResult.Unavailable>(make(FakeShell { ShellResult(1, "", "cmd: Can't find service: wifi") }).probe())
         assertEquals(FailureKind.API_UNAVAILABLE, broken.kind)
         val timeout = assertIs<ProbeResult.Unavailable>(make(FakeShell { throw BackendException(FailureKind.TIMEOUT, "slow") }).probe())

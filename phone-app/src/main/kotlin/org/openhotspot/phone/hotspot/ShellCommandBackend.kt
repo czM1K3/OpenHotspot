@@ -98,8 +98,9 @@ class ShellCommandBackend(
         }
         return try {
             val r = shell.run(listOf("cmd", "wifi", "help"), 8_000)
+            // 'cmd wifi help' prints the help text but exits 255 on Android 17 (seen on device), so judge by the output, not the exit code.
             when {
-                r.exitCode != 0 -> ProbeResult.Unavailable(FailureKind.API_UNAVAILABLE, "'cmd wifi help' exited ${r.exitCode}: ${Redactor.redact(r.stderr.ifBlank { r.stdout }, emptyList(), 160)}")
+                r.stdout.isBlank() -> ProbeResult.Unavailable(FailureKind.API_UNAVAILABLE, "'cmd wifi help' printed nothing (exit ${r.exitCode}): ${Redactor.redact(r.stderr, emptyList(), 160)}")
                 !r.stdout.contains("start-softap") -> ProbeResult.Unavailable(FailureKind.UNSUPPORTED, "'cmd wifi help' does not list start-softap")
                 else -> ProbeResult.Available(
                     "cmd wifi lists start-softap" + (if (supportsWpa3(r.stdout)) " (wpa3 supported)" else " (wpa2 only)") +
@@ -186,10 +187,11 @@ object ShellCommands {
      */
     fun parseStart(r: ShellResult): Outcome {
         val t = (r.stdout + "\n" + r.stderr).lowercase()
+        // cmd can exit non-zero even when it did its job (see the help probe), so the printed text wins over the exit code.
         return when {
-            r.exitCode != 0 -> Outcome.FAILED
             "failed" in t -> Outcome.FAILED
             "enabled successfully" in t || "started successfully" in t -> Outcome.SUCCEEDED
+            r.exitCode != 0 -> Outcome.FAILED
             else -> Outcome.UNKNOWN
         }
     }
