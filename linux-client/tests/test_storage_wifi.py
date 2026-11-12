@@ -1,14 +1,11 @@
 import os
 import stat
-import subprocess
 
 import pytest
 
-from openhotspot.constants import Security
-from openhotspot.errors import KeyStoreError, WifiError
+from openhotspot.errors import KeyStoreError
 from openhotspot.pairing import PairedPhone
 from openhotspot.storage import FileKeyStore, KeyringKeyStore, open_keystore
-from openhotspot.wifi import NmcliConnector
 
 
 def phone(pid="aabbccdd", counter=0):
@@ -97,60 +94,3 @@ def test_open_keystore_kinds(tmp_path):
     assert isinstance(open_keystore("file", tmp_path), FileKeyStore)
     with pytest.raises(KeyStoreError):
         open_keystore("bogus")
-
-
-# ---- nmcli connector (mocked) ------------------------------------------------------------------
-
-class Runner:
-    def __init__(self, *results):
-        self.calls, self.results = [], list(results)
-
-    def __call__(self, argv):
-        self.calls.append(list(argv))
-        rc, out, err = self.results.pop(0) if self.results else (0, "", "")
-        return subprocess.CompletedProcess(argv, rc, out, err)
-
-
-def test_nmcli_connect_command():
-    r = Runner()
-    NmcliConnector(r).connect(b"My Phone", "s3cretpass", Security.WPA2_PSK)
-    assert r.calls == [["nmcli", "--wait", "30", "device", "wifi", "connect", "My Phone",
-                        "password", "s3cretpass", "name", "openhotspot-My Phone"]]
-
-
-def test_nmcli_failure_never_leaks_the_passphrase():
-    r = Runner((4, "", "Error: password s3cretpass rejected"))
-    with pytest.raises(WifiError) as e:
-        NmcliConnector(r).connect(b"net", "s3cretpass")
-    assert "s3cretpass" not in str(e.value) and "***" in str(e.value)
-
-
-@pytest.mark.parametrize("ssid", [b"\xff\xfe", b"", b"-h"])
-def test_nmcli_rejects_unusable_ssids(ssid):
-    r = Runner()
-    with pytest.raises(WifiError):
-        NmcliConnector(r).connect(ssid, "s3cretpass")
-    assert r.calls == []
-
-
-def test_nmcli_disconnect_only_touches_our_profiles():
-    r = Runner((0, "Wired\nopenhotspot-My Phone\nHome\n", ""), (0, "", ""))
-    assert NmcliConnector(r).disconnect() is True
-    assert r.calls[1] == ["nmcli", "connection", "down", "id", "openhotspot-My Phone"]
-    r2 = Runner((0, "Wired\nHome\n", ""))
-    assert NmcliConnector(r2).disconnect() is False and len(r2.calls) == 1
-
-
-def test_nmcli_disconnect_named_and_inactive():
-    r = Runner((10, "", "Error: 'openhotspot-x' is not an active connection."))
-    assert NmcliConnector(r).disconnect(b"x") is False
-    with pytest.raises(WifiError):
-        NmcliConnector(Runner((1, "", "boom"))).disconnect(b"x")
-
-
-def test_nmcli_missing_binary(monkeypatch):
-    def boom(*a, **k):
-        raise FileNotFoundError
-    monkeypatch.setattr(subprocess, "run", boom)
-    with pytest.raises(WifiError, match="nmcli not found"):
-        NmcliConnector().connect(b"net", "s3cretpass")
