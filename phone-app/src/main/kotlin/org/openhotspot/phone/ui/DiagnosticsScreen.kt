@@ -74,7 +74,7 @@ fun DiagnosticsScreen(modifier: Modifier = Modifier) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Test hotspot toggle", style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "Turns the hotspot ON for about 10 seconds, checks it, then turns it OFF. Your Wi-Fi connection may drop meanwhile. " +
+                    "Turns the hotspot ON for about 35 seconds (it holds 30 s so you can join it from another device), checks it, then turns it OFF. Your Wi-Fi connection may drop meanwhile. " +
                         "Nothing is sent over Bluetooth. Pick one backend to test it alone (no fallback), or Automatic to test the real order.",
                     style = MaterialTheme.typography.bodySmall,
                 )

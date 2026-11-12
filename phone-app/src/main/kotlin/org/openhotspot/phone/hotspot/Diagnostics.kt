@@ -25,7 +25,7 @@ class DiagnosticsRunner(
     private val controller: RealHotspotController,
     private val clock: Clock,
     private val log: EngineLog = EngineLog.NONE,
-    private val holdMs: Long = 6_000,
+    private val holdMs: Long = 30_000,
     private val offTimeoutMs: Long = 8_000,
 ) {
     private val _running = MutableStateFlow(false)
