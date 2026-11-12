@@ -111,6 +111,8 @@ LTK    = HKDF(salt = pairing_secret, ikm = dh, info = "OHS1 ltk"  ‖ transcript
 `confirm = HMAC-SHA256(LTK, "OHS1 pair confirm" ‖ client_pub ‖ phone_pub)[0:16]`.
 7. Client verifies the AEAD and `confirm`, then stores `LTK` and `phone_pub` (for display and diagnostics only).
 
+**Errors during pairing.** Once the phone has successfully decrypted a `PAIR_REQ` (so the failure is authenticated), it reports `STALE_TIMESTAMP`, `TOO_MANY_CLIENTS` or `INTERNAL` as an authenticated `ERROR` frame encrypted with `K_pair` (since `K_resp` does not exist yet), `aad = header ‖ req_nonce`, plaintext `timestamp_ms(8) ‖ request_counter(8) = 0 ‖ code(1) ‖ retry_after_s(2)`. Failures before decryption succeeds (`AUTH_FAILED`, `NOT_IN_PAIRING_MODE`, `MALFORMED`) are plaintext errors as in section 5. A client treats an unauthenticated error during pairing as a hint only.
+
 Security property: only a party that saw the QR (knows `pairing_secret` and `phone_pub`) can produce a `PAIR_REQ` that decrypts, and the phone's reply proves it too. A BLE eavesdropper who did not see the QR learns nothing. Because `K_pair` and `LTK` use different `info`, compromise of `K_pair` does not reveal `LTK`.
 
 ### 4.4 Keys derived from LTK
@@ -200,7 +202,7 @@ Type `0xFF`. Two forms:
 | `0x06` | STALE_TIMESTAMP | auth | timestamp outside the allowed skew (carries nothing else; the client shows "check clocks") |
 | `0x07` | NOT_IN_PAIRING_MODE | plain | |
 | `0x08` | BUSY | auth/plain | another request is in flight |
-| `0x09` | TOO_MANY_CLIENTS | plain | pairing, 8 clients already |
+| `0x09` | TOO_MANY_CLIENTS | auth (K_pair) | pairing, 8 clients already |
 | `0x10` | SHIZUKU_UNAVAILABLE | auth | Shizuku not running or not bound |
 | `0x11` | PERMISSION_DENIED | auth | Shizuku permission not granted |
 | `0x12` | HOTSPOT_FAILED | auth | tethering API call failed or timed out |
