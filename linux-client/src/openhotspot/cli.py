@@ -17,7 +17,8 @@ from .errors import KeyStoreError, NotPairedError, OpenHotspotError, PairingErro
 from .pairing import PairingQr
 from .qr import decode_qr_image, resolve_qr_argument
 from .storage import KeyStore, open_keystore
-from .transport import BleTransport, Transport
+from .ble import BleakTransport
+from .transport import Transport
 from .wifi import NmcliConnector, WifiConnector
 
 EXIT_OK, EXIT_ERROR, EXIT_USAGE, EXIT_NOT_PAIRED = 0, 1, 2, 3
@@ -124,7 +125,7 @@ async def _run(args: argparse.Namespace, deps: Deps) -> int:
 def main(argv: Sequence[str] | None = None, deps: Deps | None = None) -> int:
     args = build_parser().parse_args(argv)
     if deps is None:
-        deps = Deps(open_keystore(args.keystore, args.config_dir), BleTransport(), NmcliConnector())
+        deps = Deps(open_keystore(args.keystore, args.config_dir), BleakTransport(), NmcliConnector())
     try:
         return asyncio.run(_run(args, deps))
     except NotPairedError as exc:

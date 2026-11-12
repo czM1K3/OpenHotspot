@@ -129,15 +129,3 @@ def test_several_phones_need_an_explicit_choice(env, clock, capsys):
     assert "--phone" in capsys.readouterr().err
     pid = next(p.phone_id for p in deps.store.list() if p.phone_id != deps.store.list()[0].phone_id)
     assert cli(deps2, "connect", "--phone", pid) == 0
-
-
-def test_default_deps_use_ble_stub_and_say_so(tmp_path, capsys):
-    # no injected deps: real BLE is not implemented until Batch 4, and the CLI must say so cleanly
-    assert main(["--keystore", "file", "--config-dir", str(tmp_path), "pair", "openhotspot://pair/" + "A" * 87]) == 1
-    # a syntactically valid QR gets as far as the transport
-    from openhotspot.pairing import PairingQr
-    from openhotspot.constants import SERVICE_UUID_BYTES
-    qr = PairingQr(1, SERVICE_UUID_BYTES, bytes(range(1, 33)), bytes(16)).encode()
-    capsys.readouterr()
-    assert main(["--keystore", "file", "--config-dir", str(tmp_path), "pair", qr]) == 1
-    assert "not implemented yet (Batch 4)" in capsys.readouterr().err

@@ -1,3 +1,5 @@
+import asyncio
+import inspect
 import json
 from pathlib import Path
 
@@ -49,3 +51,13 @@ def make_client(clock, phone, tmp_path):
         return HotspotClient(transport, store, clock=clock, monotonic=clock), transport, store
 
     return _make
+
+
+# Run `async def` tests with asyncio.run, so no pytest plugin (and no extra dependency) is needed.
+@pytest.hookimpl(tryfirst=True)
+def pytest_pyfunc_call(pyfuncitem):
+    if inspect.iscoroutinefunction(pyfuncitem.obj):
+        kwargs = {name: pyfuncitem.funcargs[name] for name in pyfuncitem._fixtureinfo.argnames}
+        asyncio.run(pyfuncitem.obj(**kwargs))
+        return True
+    return None

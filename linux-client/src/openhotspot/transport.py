@@ -1,4 +1,4 @@
-"""Transport interface, in-memory implementation, and the real-BLE stub (Batch 4)."""
+"""Transport interface and the in-memory implementation. The real one is in ble.py."""
 from __future__ import annotations
 
 import asyncio
@@ -108,15 +108,3 @@ class InMemoryTransport(Transport):
         conn = InMemoryConnection(self._endpoint.open_link(self.mtu), self.mtu)
         self.connections.append(conn)
         return conn
-
-
-# ---- real BLE (Batch 4) -------------------------------------------------------------------
-
-class BleTransport(Transport):
-    """Placeholder for the BlueZ/bleak transport, planned for Batch 4."""
-
-    async def scan(self, matcher: Callable[[Advertisement], bool], timeout: float) -> Advertisement | None:
-        raise NotImplementedError("the real BLE transport is not implemented yet (Batch 4)")
-
-    async def connect(self, adv: Advertisement) -> Connection:
-        raise NotImplementedError("the real BLE transport is not implemented yet (Batch 4)")

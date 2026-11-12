@@ -51,6 +51,17 @@ class TransportTimeout(TransportError):
     pass
 
 
+class BluetoothError(TransportError):
+    """BlueZ or the adapter refused or failed; ``hint`` says what the user can do about it.
+
+    ``retryable`` is True for transient failures (connection aborted, operation in progress).
+    """
+
+    def __init__(self, summary: str, hint: str = "", *, retryable: bool = False) -> None:
+        super().__init__(f"{summary}. {hint}" if hint else summary)
+        self.summary, self.hint, self.retryable = summary, hint, retryable
+
+
 class PhoneNotFound(TransportError):
     """No matching advertisement was seen before the scan timeout."""
 
@@ -65,3 +76,11 @@ class KeyStoreError(OpenHotspotError):
 
 class NotPairedError(KeyStoreError):
     """No paired phone, or the choice of phone is ambiguous."""
+
+
+class ConnectivityError(OpenHotspotError):
+    """Joined the hotspot but the internet did not become reachable."""
+
+
+class ConfigError(OpenHotspotError):
+    """The configuration file is unreadable or invalid."""
