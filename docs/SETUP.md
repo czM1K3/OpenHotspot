@@ -1,6 +1,6 @@
 # Setup
 
-Only the **Linux** section is written so far. The phone (Shizuku, battery exemption, pairing screen) and tablet sections are still to do; until then see `phone-app/` and `docs/HOTSPOT_BACKENDS.md`. You need a phone running the OpenHotspot app with Shizuku started, and its pairing QR on screen, to follow the steps below.
+The **Linux** and **Android tablet** sections are written. The phone section (Shizuku, battery exemption, pairing screen) is still to do; until then see `phone-app/` and `docs/HOTSPOT_BACKENDS.md`. You need a phone running the OpenHotspot app with Shizuku started, and its pairing QR on screen, to follow the steps below.
 
 Status of everything below: the Linux client's logic, the BLE transport (against a mocked bleak), the daemon, the config and the scripts are unit tested; **nothing has yet been run against a real phone**. `docs/TESTING.md` lists what to check by hand.
 
@@ -108,3 +108,48 @@ Start with `openhotspot doctor` and `openhotspot -v <command>`; errors name the 
 ### Removing
 
 `packaging/uninstall.sh` (add `--purge` to delete config, pairing keys file and state too). A key kept in the system keyring is not touched; `secret-tool clear service openhotspot username phones` removes it. Remove the laptop in the phone app, or run `openhotspot unpair` first.
+
+
+## Android tablet
+
+Status: the tablet app builds, its protocol/flow/auto-trigger logic is unit tested against the real phone-side engine, and it launches on an emulator. **It has not been run against a real phone, and it has not been tested on any Samsung device.** Everything below about Samsung and One UI is collected from general knowledge of Android and One UI behaviour and is marked *unverified*; `docs/TESTING.md` section 11 is the checklist for verifying it.
+
+### Install and pair
+
+1. `./gradlew :tablet-app:assembleDebug`, then install `tablet-app/build/outputs/apk/debug/tablet-app-debug.apk` (Android 11 or newer).
+2. Open the app, **Pair a phone**. Allow Camera and Nearby devices (Android 13+ also asks for Nearby Wi-Fi devices; on Android 11 the scan needs Location, and Location must be switched on).
+3. On the phone open the OpenHotspot pairing screen and scan its QR (valid 120 s, single use). No camera? Paste the `openhotspot://pair/...` link instead. The key is stored encrypted with an Android Keystore key.
+
+### Use
+
+- **Connect to phone hotspot** (button): finds the phone, turns its hotspot on, joins, checks the internet, shows progress and readable errors. **Disconnect** leaves the Wi-Fi and switches the phone's hotspot off (or keep it on).
+- **Quick Settings tile** "Phone hotspot": tap to connect (opens the app, because Android's Wi-Fi confirmation prompt needs a visible app), tap again to disconnect. Android 13+: Settings, *Add the tile*; older: edit your Quick Settings and drag it in.
+- **Auto-connect** (Settings, off by default): while the tablet has no internet and a paired phone is in range, connect by itself. It scans only while offline (10 s offline first, then 6 s windows every 60 s, backing off to 5 min), never while online or connected, and waits the chosen cooldown (1 to 60 min) between attempts, counted from the start of an attempt. It needs a foreground service, hence a permanent notification.
+
+### Two ways to join, and why it matters
+
+| | Quick, this app only (default) | Share with all apps |
+|---|---|---|
+| API | `WifiNetworkSpecifier` | `WifiNetworkSuggestion` |
+| Prompt | Android shows its own *Connect* dialog every time; the app must be on screen | First suggestion needs approval in a notification, then none |
+| Who uses the Wi-Fi | **Only OpenHotspot** (the app binds its process to the network and verifies the internet). Browsers and other apps keep using whatever the tablet normally uses | The whole tablet |
+| Timing | Immediate | The system decides, typically seconds to a minute |
+
+So with the default method the internet check proves the hotspot works, but other apps do not benefit. For real use pick *Share with all apps*. (This is Android's documented behaviour for specifier networks as I understand it; it is part of the on-device checklist.) Specifier needs the SSID as text, so a non-UTF-8 hotspot name only works with suggestions on Android 13+.
+
+### Samsung One UI notes (all unverified, no Samsung device was available)
+
+- **Battery.** One UI puts apps to "sleep" aggressively. Settings, Battery, Background usage limits: remove OpenHotspot from *Sleeping apps* and *Deep sleeping apps*, add it to *Never sleeping apps*, and set the app's battery to *Unrestricted*. The app's *Allow background use* button only covers Android's standard exemption, which One UI does not treat as enough. Without this the auto-trigger's scans can be delayed or stopped, and it may not survive a reboot (the boot receiver only runs if the app is not force-stopped).
+- **Background BLE.** Android allows five scan starts per 30 s per app; the auto-trigger stays far below that. With the screen off, scans from a foreground service continue only while the notification stays; swiping the app away in recents on One UI may kill the service despite it being foreground. If auto-connect stops working after a while, check *Never sleeping apps* first. Android 14 also needs Nearby devices granted for a `connectedDevice` foreground service to start.
+- **Auto Hotspot / Wi-Fi conflicts.** Samsung's own *Auto Hotspot* (Settings, Connections, Mobile Hotspot and Tethering, *Auto Hotspot*) and *Quick Share* use the same Galaxy account and Bluetooth; they work between Samsung devices only, so they should not conflict with this app, but two things can interfere: (1) if the phone is a Samsung, its Auto Hotspot may switch its hotspot on or off independently of OpenHotspot, which looks like the hotspot "turning off by itself"; turn it off on the phone while testing. (2) On the tablet, *Switch to mobile data* / *Auto switch between Wi-Fi networks* (Settings, Connections, Wi-Fi, Intelligent Wi-Fi) can drop the hotspot as a "bad" network or move the tablet off it; turn Intelligent Wi-Fi off while testing. *Wi-Fi Calling* and *Smart network switch* are other candidates.
+- **Wi-Fi prompt.** One UI shows the specifier dialog as an Android system sheet; if the app is in the background (auto-trigger, tile) it may not appear, in which case the request times out after 60 s with "Could not join the hotspot". Use *Share with all apps* for unattended auto-connect.
+- **Random MAC.** The tablet uses a per-network random MAC; some phones' hotspots with *Allowed devices* lists then reject it. Disable the list on the phone's hotspot.
+- **Samsung DeX / Secure Folder / Work profile** installs are untested; install in the main profile.
+
+### Troubleshooting
+
+- *Phone not found nearby*: phone service not running, Bluetooth off, or the phone's battery policy stopped its advertising (PROTOCOL.md R5). On Android 11 the tablet also needs Location switched on to scan.
+- *Clocks differ by more than a minute*: enable automatic date and time on both devices.
+- *Could not join the hotspot*: Android reports "user declined" and "not found" identically. Approve the prompt; try 2.4 GHz on the phone; set *hidden* in Settings if the hotspot hides its name.
+- *Joined, but the internet is not reachable*: the phone has no mobile data, or it used its local-only fallback (DECISIONS.md D29), or a captive portal intercepts. The check fetches `http://connectivitycheck.gstatic.com/generate_204` over the hotspot (the only cleartext destination the app allows).
+- *The phone did not accept this tablet* (AUTH_FAILED): the phone removed this tablet. The key is kept (an unauthenticated error never deletes it); unpair and pair again.

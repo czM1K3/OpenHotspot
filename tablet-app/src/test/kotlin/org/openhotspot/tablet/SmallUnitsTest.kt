@@ -233,6 +233,6 @@ class UiTextTest {
     }
 
     @Test fun cooldownLabels() {
-        assertEquals("1 min", cooldownLabel(60)); assertEquals("15 min", cooldownLabel(900)); assertEquals("1 h", cooldownLabel(3600))
+        assertEquals("1 min", cooldownLabel(60)); assertEquals("15 min", cooldownLabel(900)); assertEquals("60 min", cooldownLabel(3600))
     }
 }

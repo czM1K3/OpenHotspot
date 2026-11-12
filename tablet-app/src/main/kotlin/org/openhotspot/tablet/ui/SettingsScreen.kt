@@ -116,7 +116,7 @@ fun SettingsScreen() {
     }
 }
 
-fun cooldownLabel(seconds: Int): String = if (seconds < 3600) "${seconds / 60} min" else "${seconds / 3600} h"
+fun cooldownLabel(seconds: Int): String = "${seconds / 60} min"
 
 @Composable
 private fun JoinOption(s: AppSettings, method: JoinMethod, title: String, text: String, onPick: (JoinMethod) -> Unit) {

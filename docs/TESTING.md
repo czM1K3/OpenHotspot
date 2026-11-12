@@ -117,3 +117,24 @@ Set `[daemon]` as needed in `~/.config/openhotspot/config.toml`. Watch with `jou
 - [ ] Replay the three exchanges against the real app and compare with `docs/test-vectors.json`: pairing (`PAIR_REQ`/`PAIR_RESP`), `ENABLE`/`ENABLE_RESP`, an unauthenticated error. A mismatch is a protocol bug: fix PROTOCOL.md and the vectors first (CLAUDE.md rule).
 - [ ] `QUERY` while the hotspot is `STARTING` returns the state and, once ON, the credentials.
 - [ ] A request sent twice fast: the second is `BUSY` or processed in order; never two enables.
+
+
+### 11. Android tablet (nothing here has been done yet)
+
+Automated (`./gradlew :tablet-app:testDebugUnitTest`): the BLE client against the **real** `PhoneEngine` through an in-memory transport (pairing, ENABLE/QUERY, MTU 23 chunking, replay refusal, counters stored before sending), the connect flow (retry with a new counter, STARTING polling, no-internet handling), the controller (busy, cancel, disconnect, network lost), the auto-trigger (cooldown, back-off, never scans online) and the encrypted store. Observed on an emulator (Android 36, Google APIs): the app launches, Settings and Home render, no crash. **Not covered anywhere:** `GattTransport`, both Wi-Fi joiners, the camera and ML Kit decoding, the Quick Settings tile, the foreground service, permissions flow.
+
+On a real tablet and phone, tick only when the expected result happened:
+
+- [ ] Pair by camera QR; the phone lists the tablet; kill and reopen the app: the phone is still listed (Keystore store works).
+- [ ] `adb logcat -s OpenHotspot`: connect log shows no SSID or passphrase.
+- [ ] MTU: record the negotiated value (expected 247 or more on Android 14+).
+- [ ] Specifier: the system prompt appears, approving joins, the internet check passes, `adb shell dumpsys connectivity` shows the bound network; **a browser on the tablet does not use the hotspot** (documents the limitation). Declining the prompt gives the "Could not join" error, not a hang.
+- [ ] Suggestion: approval notification, connection within a minute, a browser uses the hotspot; Disconnect removes the suggestion and the tablet leaves.
+- [ ] Hidden SSID, WPA3-only, 5 GHz, non-ASCII SSID (specifier refuses non-UTF-8, suggestion on 13+ works).
+- [ ] Tile: connect, disconnect, behaviour with no paired phone, on the lock screen.
+- [ ] Auto-connect: turn Wi-Fi off, phone nearby: connects within about 90 s; cooldown respected after you disconnect; no scanning while online (`adb shell dumpsys bluetooth_manager` scan stats); screen off for 30 min; reboot (service restarts); force-stop (does not, expected).
+- [ ] Auto-connect with the specifier method from the background: record whether the prompt shows (SETUP.md says it may not).
+- [ ] Phone without data: the auto attempt undoes the join and switches the phone's hotspot off.
+- [ ] Android 11 (API 30) device: scan works with Location on and fails clearly with it off.
+- [ ] **Samsung One UI**: each statement in the SETUP.md Samsung notes: *Sleeping apps* effect on auto-connect, Intelligent Wi-Fi interference, Auto Hotspot on a Samsung phone, prompt in the background, scan survival after swiping the app away. Record One UI and Android versions.
+- [ ] A device without Google Play services (for example a de-Googled ROM): QR scanning still works (the bundled ML Kit model is in the APK; this is unverified on such a device).
