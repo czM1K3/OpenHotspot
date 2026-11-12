@@ -8,3 +8,12 @@ local.properties
 *.jks
 .idea/
 *.egg-info/
+
+# Gradle / Android
+.gradle/
+**/build/
+!gradle/wrapper/gradle-wrapper.jar
+local.properties
+*.apk
+*.aab
+.kotlin/
