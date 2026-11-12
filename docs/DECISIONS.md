@@ -26,7 +26,7 @@ The phone tries each paired client's key (max 8). This keeps clients untrackable
 ## D8. Per-client advertisement tokens, round-robin
 Token = truncated HMAC over a 5-minute window, key derived per client so revoking one client does not require re-keying the others, and no shared secret is needed. Cost: depends on Android allowing the service data to change about once per second (R6). Fallback documented there.
 
-## D9. Crypto provider on Android: OPEN
+## D9. Crypto provider on Android: RESOLVED in D20 (pure Kotlin in :common)
 Whether to use the platform provider (ChaCha20-Poly1305 and X25519 availability per API level is unverified, see R1) or a small library. Must be decided, with its license added below, before `common` is implemented. First step of the next batch: test on the actual devices.
 
 ## D10. Python vectors tool is stdlib-only with its own reference implementations
@@ -61,6 +61,29 @@ PROTOCOL.md allows reading Status first. The client reads it only for the `statu
 2. The advertisement vector used Python's `uuid.bytes_le` (mixed-endian GUID layout) instead of the fully reversed bytes BLE requires. `gen_vectors.py`, `test-vectors.json` and PROTOCOL.md section 3 were corrected; the Kotlin implementation must follow the corrected vector.
 3. In the client, authenticated error frames are surfaced before the local timestamp-skew check, so a clock problem reports the phone's `STALE_TIMESTAMP` instead of a local protocol error.
 
+## D20. Crypto in `:common` is pure Kotlin, not the platform provider (resolves D9)
+Android guarantees X25519 only from API 33 and our minSdk is 30, so relying on the platform would break Android 11 and 12 phones. `:common` therefore implements X25519 (a port of public-domain TweetNaCl), ChaCha20 and Poly1305 (26-bit limbs, after poly1305-donna) itself. HKDF and HMAC use `javax.crypto.Mac` (available everywhere). Safety net: RFC 7748, 5869 and 8439 known answers; randomized differential tests against the JDK's own X25519 and ChaCha20-Poly1305 (every length 0..130 and more); a test that flips every bit of a sealed message; and replaying the Python vectors. The code avoids secret-dependent branches and tables, but the JVM gives no constant-time guarantee and the implementation has had no external audit. Revisit if a vetted library with an acceptable licence is ever preferred.
+
+## D21. Build toolchain: AGP 8.13 / Gradle 8.14.3 / Kotlin 2.2.21
+The newest releases (AGP 9.x, Gradle 9.x, Kotlin 2.5 RC) change the Android DSL and plugin model substantially. We chose the previous, well-understood generation and pinned everything in `gradle/libs.versions.toml`. `compileSdk` 36, `targetSdk` 35, `minSdk` 30, build tools 35.0.1. Sources compile with the JDK 21 toolchain and emit Java 17 bytecode (what Android and D8 expect). The Gradle wrapper's `distributionSha256Sum` is pinned to Gradle's published checksum. Migrating to AGP 9 is future work. `local.properties` (the SDK path) is not committed.
+
+## D22. Phone-side protocol engine lives in `:common`
+`PhoneEngine` (pairing window, trial decryption, replay and timestamp checks, rate limiting, dispatch, advertisement tokens) is pure JVM and sits in `:common` behind `ClientStore`, `HotspotController`, `Clock`, `RandomSource` and `EngineLog` interfaces. That makes the security-critical logic unit-testable without a device, lets the Kotlin side be replayed against the Python vectors byte for byte, and keeps `:phone-app` to moving bytes. The tablet app does not use it.
+
+## D23. Phone key storage: Keystore AES-256-GCM over an app-private file
+Client keys are written as one blob encrypted with a non-exportable AES-256-GCM key in the Android Keystore (StrongBox if available, else TEE), AAD-bound, atomically replaced (temp file, fsync, rename) in `noBackupFilesDir`. Backup and device transfer are disabled. No user-authentication requirement, since the service must work on a locked phone. If the blob cannot be decrypted (lost key, tampering) the app starts with no clients and keeps the file as `clients.bin.corrupt` rather than trusting or deleting it. Lockout state is persisted in plain SharedPreferences (not secret).
+
+## D24. Phone app structure and Android specifics
+- **Permissions:** API 30 needs only install-time `BLUETOOTH`/`BLUETOOTH_ADMIN`; API 31+ asks for `BLUETOOTH_ADVERTISE` and `BLUETOOTH_CONNECT`; API 33+ adds `POST_NOTIFICATIONS`. `BLUETOOTH_SCAN` is deliberately not requested because the phone never scans (on API 30 it would also pull in location).
+- **Service:** foreground service of type `connectedDevice`, `START_STICKY`. A boot/package-replaced receiver restarts it only if the user left it running, start-on-boot is on and Bluetooth permission is held (BOOT_COMPLETED is exempt from the background FGS-start rules, and connectedDevice is not an Android 15 restricted type).
+- **GATT:** each connection has an ordered input channel, an ordered output channel and exactly one notification in flight (gated on `onNotificationSent`). One unauthenticated connection at a time; 10 s idle limit before authenticating, 30 s after. Writes are acknowledged at the GATT level immediately; protocol errors travel in notifications.
+- **Advertising:** one advertisement, no name, no TX power, only the service data. A 1 s loop restarts it only when the token changes (so a single client restarts every 5 minutes; several clients rotate each second, which is the open risk R6).
+- **UI:** pairing QR only while the pairing screen is in the foreground (closed on stop) and with `FLAG_SECURE` (screenshots come out black, verified on an emulator); the log is an in-memory ring buffer that is never persisted and never fed secrets.
+- **Battery:** the exemption is requested with the one-tap system dialog and re-checked on resume.
+
+## D25. Spec clarifications found by the second implementation
+The counter is an unsigned 64-bit integer, compared unsigned. A pairing label must be valid UTF-8 (else `MALFORMED`). In v1 a nonzero ENABLE `options` byte gets `UNSUPPORTED_REQUEST`. PROTOCOL.md, the Python fake phone and the Kotlin engine all follow. Beyond these, the Kotlin engine reproduced the Python vectors byte for byte on the first run.
+
 ## Dependencies and licenses
 
 | Dependency | Where | License | Status |
@@ -74,3 +97,9 @@ PROTOCOL.md allows reading Status first. The client reads it only for the `statu
 | `pytest` | linux-client dev only | MIT | dev only |
 | `zbarimg` (ZBar) | external CLI for QR images, not linked | LGPL-2.1 | optional external tool |
 | Android platform APIs | apps | n/a (AOSP, Apache-2.0) | no Google Play Services |
+| `kotlinx-coroutines` (core, android; test for `:common`) | `:common`, `:phone-app` | Apache-2.0 | used |
+| ZXing `core` | `:phone-app` (QR rendering; pure Java, no Play Services) | Apache-2.0 | used |
+| AndroidX core-ktx, activity-compose, lifecycle-*, Compose BOM (ui, material3, tooling) | `:phone-app` | Apache-2.0 | used |
+| Android Gradle Plugin, Kotlin Gradle plugin (build only) | build | Apache-2.0 | build only |
+| `kotlin-test`, Gson | tests only | Apache-2.0 | test only |
+| JUnit 4 | tests only | EPL-1.0 | test only, not shipped |

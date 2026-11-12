@@ -62,7 +62,7 @@ Rules: LTK never leaves the device except through the QR-based pairing, is never
 
 ## 6. Known limitations
 
-1. **Pairing relies on the QR being private.** Anyone who photographs it within the 120 s window can pair (and the phone shows no per-pairing confirmation in v1).
+1. **Pairing relies on the QR being private.** Anyone who photographs it within the 120 s window can pair (and the phone shows no per-pairing confirmation in v1). The phone app blocks screenshots of the QR screen (`FLAG_SECURE`) and closes the window when the screen leaves the foreground, but cannot stop a camera.
 2. **Delayed replay within 60 s** can trigger one hotspot activation (PROTOCOL.md section 6, R8). Nothing leaks.
 3. **Anyone in range can read Status** (ready, pairing window open, hotspot active) and can tell that an OpenHotspot phone is nearby (R12).
 4. **The Wi-Fi passphrase is a long-lived secret** transferred to every paired client; compromise of any client exposes it (section 4).

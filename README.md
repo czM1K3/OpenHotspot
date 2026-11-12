@@ -2,14 +2,14 @@
 
 Turn on the internet-sharing hotspot of a stock Android phone from a Linux laptop or an Android tablet over Bluetooth LE, and connect automatically, similar to Apple's Instant Hotspot. The phone side uses [Shizuku](https://shizuku.rikka.app/) to toggle tethering without root. No Google Play Services.
 
-**Status: protocol designed; the Linux client's protocol logic and a phone simulator are implemented and tested. No real BLE, no Android code yet.**
+**Status: protocol designed and implemented in Python (Linux client) and Kotlin (`:common`, phone app). The phone app runs but returns fake credentials: no Shizuku or real hotspot yet. No real BLE has been tested.**
 
 ## Layout
 
 | Path | Purpose | State |
 |---|---|---|
-| `common/` | Kotlin protocol and crypto, shared by both Android apps | placeholder |
-| `phone-app/` | Android app on the phone (BLE GATT server, Shizuku tethering control) | placeholder |
+| `common/` | Kotlin/JVM protocol, crypto and the phone-side `PhoneEngine`; passes `docs/test-vectors.json` | working |
+| `phone-app/` | Android app (Compose): foreground service, GATT server, pairing QR, revoke, log. **Fake hotspot backend only** | builds, not tested on real BLE |
 | `tablet-app/` | Android app on the tablet (BLE client, Wi-Fi connect) | placeholder |
 | `linux-client/` | Python 3.11+ client: protocol, FakePhone simulator, CLI. Real BLE pending | working, no BLE |
 | `docs/PROTOCOL.md` | Wire protocol. **Source of truth.** | v1 draft |
@@ -28,6 +28,13 @@ Turn on the internet-sharing hotspot of a stock Android phone from a Linux lapto
 
 Details: [docs/PROTOCOL.md](docs/PROTOCOL.md). Risks and open questions are at its end.
 
+## Build and test (Android and Kotlin)
+
+```
+./gradlew test assembleDebug     # needs JDK 17+ and the Android SDK (set sdk.dir in local.properties)
+```
+Debug APK: `phone-app/build/outputs/apk/debug/phone-app-debug.apk`. The Linux client has its own tests (see `linux-client/README.md`).
+
 ## Verifying the vectors
 
 ```
@@ -35,7 +42,7 @@ python3 docs/tools/gen_vectors.py          # regenerate and verify
 python3 docs/tools/gen_vectors.py --check  # fail if docs/test-vectors.json is stale
 ```
 
-Every implementation (Kotlin, Python) must reproduce these vectors in its unit tests.
+Both implementations reproduce these vectors in their unit tests, and the Kotlin phone engine is replayed against the Python-generated frames byte for byte.
 
 ## License
 
