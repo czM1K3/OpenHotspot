@@ -2,7 +2,7 @@
 
 ## What the automated tests prove, and what they cannot
 
-Run: `cd linux-client && .venv/bin/python -m pytest` (about 250 tests, a few seconds, no hardware, no root).
+Run: `cd linux-client && .venv/bin/python -m pytest` (about 260 tests, a few seconds, no hardware, no root) and `./gradlew test assembleDebug lintDebug` (about 350 JVM tests across `:common`, `:phone-app`, `:tablet-app`; lint must report zero issues). CI (`.github/workflows/ci.yml`) runs both on every push.
 
 | Area | Automated (mocked) | Needs a real phone / BlueZ / NetworkManager |
 |---|---|---|
@@ -18,6 +18,95 @@ Run: `cd linux-client && .venv/bin/python -m pytest` (about 250 tests, a few sec
 | Phone app side | Not covered here (see `docs/HOTSPOT_BACKENDS.md`) | all of it |
 
 Already observed on real Linux (development machine, BlueZ 5.87, NetworkManager 1.58, Bluetooth switched off at the time): `openhotspot doctor` ran correctly against real `bluetoothctl`, `nmcli` and `timedatectl` and flagged the powered-off adapter; a real bleak scan reached BlueZ over D-Bus and returned the translated "Bluetooth is turned off" error. No advertisement was ever received and no connection was ever made.
+
+## Core scenario checklist (phone + client, real hardware)
+
+Do this first. It covers the scenarios that matter most and ties together the more detailed per-client sections 0 to 11 below. Setup: phone with the app, Shizuku started and authorized, **Start service** pressed (SETUP.md); one Linux laptop (and later the tablet). Record phone model, Android and OEM version, laptop BlueZ version, results and anything surprising. Tick a box only when the **expected** result happened. For each failure save: the phone's **Log** tab, `openhotspot -v` output, and `btmon` if it is a BLE problem.
+
+Notation: **P** = on the phone, **L** = on the Linux laptop, **T** = on the tablet.
+
+### S1. Pairing
+
+- [ ] **P** Pairing tab, *Show pairing QR*: a QR and a countdown from 120 s appear; a screenshot (power+volume) shows a black/blank QR area (`FLAG_SECURE`).
+- [ ] **L** `openhotspot pair "$(zbarcam --raw -1 /dev/video0)"` prints *Paired*. **P** lists the laptop under its label with *0 requests*, and the QR screen reverts to the *Show pairing QR* button (window closed after one use).
+- [ ] The same QR scanned again (second device or a photo taken earlier) is refused: the client says the phone is not in pairing mode.
+- [ ] **Expiry.** Show a QR, wait 125 s, scan: refused; the phone's countdown stopped and the QR disappeared at 0.
+- [ ] **Three strikes.** Show a QR; from a second client run `openhotspot pair` with a *wrong but well-formed* QR for this phone (edit the last characters of the secret) three times: after the third the phone's QR disappears. A fourth with the *correct* QR fails (needs a new QR).
+- [ ] **Leaving the screen.** Show a QR, press Home: on return the QR is gone (window closed).
+- [ ] **T** Pair the tablet by camera, then a second time by pasting the link; both leave the phone showing separate entries. Pair clients until 8 are paired: the 9th is refused (`TOO_MANY_CLIENTS`).
+- [ ] After pairing, `grep -ri -E 'ltk|passphrase' ` on `adb logcat -d` of the phone shows no key or password values.
+
+### S2. Hotspot on / off
+
+- [ ] **L** `openhotspot -v connect` (hotspot initially off): hotspot on at the phone within about 5 s on a good run, laptop joins, `status` shows `hotspot: ON`, the internet works. Record the total time.
+- [ ] **P** Status tab shows *Hotspot is ON via ShizukuTetheringBackend*, the Android hotspot toggle shows on, and the notification/log has *ENABLE ... handled* with **no SSID or password** in the Log tab.
+- [ ] Connect again with the hotspot already on: succeeds, one `openhotspot-*` profile.
+- [ ] **L** `openhotspot disconnect`: laptop leaves, the hotspot turns **off** on the phone.
+- [ ] **T** *Connect to phone hotspot* and *Disconnect*: same expectations. **Tile** also.
+- [ ] Hotspot turned on by hand in Android's settings, then **L** `connect`: no error, credentials come from the saved config.
+- [ ] Hotspot turned off by hand while a client is connected: the next client request turns it on again.
+- [ ] Phone mobile data off: client reports the hotspot has no internet and (daemon/auto) undoes the join.
+- [ ] **Credentials fidelity.** The SSID and password the client joined with equal those in Android's hotspot settings (including a password with spaces and non-ASCII characters, and the 63-character maximum).
+- [ ] **Backend fallback.** Diag tab, run *Test hotspot toggle* for each backend chip; paste the report. On Android 17 expect Shizuku TetheringManager PASS, shell backend reported unavailable.
+
+### S3. Auto-off
+
+- [ ] **P** Settings: auto-off 2 minutes. **L** `connect`, then `disconnect --keep-hotspot`. With **no client joined**, the hotspot turns off after about 2 minutes (Log: auto-off).
+- [ ] With a client **joined** (laptop on the hotspot), the hotspot stays on well past 2 minutes. Leave the client; it goes off about 2 minutes later (timer restarted from zero).
+- [ ] `openhotspot connect --auto-off 60` with a longer phone setting: the shorter value wins; `connect --auto-off 3600` with a 2-minute setting does not extend it.
+- [ ] Setting 0 disables auto-off: hotspot stays on for 15 minutes with no client.
+- [ ] Android kills the OpenHotspot process while the hotspot is on (`adb shell am kill org.openhotspot.phone`): record what happens (design says the hotspot **stays on**: no timer survives). This is a known limitation, confirm the actual behaviour.
+
+### S4. Revoke
+
+- [ ] **P** Pairing tab, *Revoke* the laptop, confirm. **L** `connect` fails with *AUTH_FAILED / pairing may have been removed* and does **not** delete the local key; the phone no longer advertises that client's token (`daemon --once` reports no phone nearby for the laptop, `bluetoothctl` service data differs).
+- [ ] The tablet, paired to the same phone, still connects (revoking one client leaves others working).
+- [ ] Re-pair the laptop with a new QR: works, shows as a new entry.
+- [ ] **Client-initiated:** **L** `openhotspot unpair` removes the laptop from the phone's list and deletes the local key. With the phone out of range it reports that the phone could not be told, and still deletes the local key.
+- [ ] **Revoked client and the password.** After revoking, the old laptop can still join Wi-Fi with the **old password** if it saved it (profiles are deleted on `disconnect`; check `nmcli connection show`). Change the hotspot password in Android: the old laptop can no longer join; the tablet gets the new one on its next connect.
+- [ ] **P** Remove all clients: every client fails, the phone stops advertising (no token to advertise).
+
+### S5. Replay and other attacks (run `tools/attack_probe.py` on the laptop)
+
+Use the paired laptop. Each prints PASS/FAIL.
+
+- [ ] `python tools/attack_probe.py replay`: first QUERY answered, identical re-send answered with an **authenticated REPLAY**; the phone's Log shows *replayed counter* and the hotspot state is unchanged.
+- [ ] `... stale`: STALE_TIMESTAMP (authenticated). Also set the laptop clock 2 min ahead and run a normal `connect`: *clocks differ*; restore the clock.
+- [ ] `... tamper`: plain AUTH_FAILED, no effect on the phone. `... version`: plain UNSUPPORTED_VERSION.
+- [ ] `... hold`: the phone disconnects a silent connection after about **10 s** (this checks the fix described in SECURITY.md section 7: it must not stay connected for 25 s).
+- [ ] While one connection is held open and silent (`bluetoothctl connect <address>` of the phone, no further action), a real `connect` from another client **works after at most ~10 s** and does not hang indefinitely.
+- [ ] `... lockout --yes`: after six junk frames the phone answers plain **RATE_LIMITED** with a retry time; a valid `connect` during the lockout gets RATE_LIMITED without the phone decrypting anything (Log shows *Lockout*); after the lockout a valid request works. Repeating immediately gives a longer lockout (doubling). **P** shows the lockout (notification/Log).
+- [ ] The lockout survives restarting the app: trigger a lockout, `adb shell am force-stop org.openhotspot.phone`, restart the service within 30 s, a valid request still gets RATE_LIMITED.
+- [ ] Capture one real ENABLE exchange with `btmon -w capture.snoop` (or the Android HCI snoop log) and check by eye that SSID and password do not appear in the capture in plaintext (`strings capture.snoop | grep -i <ssid>` finds nothing).
+- [ ] Phone's Status characteristic is readable without pairing (`bluetoothctl` GATT read of `7e5f0004-...` gives 2 bytes); it contains no name, SSID or password.
+
+### S6. Out-of-range behaviour
+
+- [ ] Phone 3+ m away behind a wall (or switch to Bluetooth off on the phone): **L** `connect` ends with *phone not found nearby* within `scan_timeout` (about 10 s), exit code non-zero, no traceback.
+- [ ] Walk away **during** `connect` (after the request is written, before the response): error within about 30 s, no hang. Retry once back in range: works, with **no** REPLAY or counter error (fresh counter).
+- [ ] Hotspot already on and the client moves out of Wi-Fi range: the laptop's Wi-Fi drops cleanly; no stale profile blocks reconnecting (`nmcli connection show | grep openhotspot`).
+- [ ] **Daemon** (auto mode) with the phone away: scans back off to the long interval; phone returns: connected within one scan interval. **T** auto-connect: same.
+- [ ] Maximum practical range: record how far from the phone the laptop still finds it (walk until `daemon --once` stops seeing it), indoors and in the open.
+- [ ] A different, unpaired OpenHotspot phone nearby: the laptop ignores it (token does not match), does not connect.
+
+### S7. Reboot persistence
+
+- [ ] **P** Reboot the phone with *Start after reboot* on and Shizuku **not** restarted: after unlock, the OpenHotspot notification returns by itself (service restarted) and clients **find** the phone, but `connect` fails with `SHIZUKU_UNAVAILABLE` (expected, documented).
+- [ ] Restart Shizuku (wireless debugging, SETUP.md step 2), **without** touching OpenHotspot: the Status card turns to *ready* by itself (`binder received`) and `connect` works, with the **same pairings** (no re-pairing) and no counter errors.
+- [ ] Reboot with *Start after reboot* **off**: the service does not start; starting it by hand works.
+- [ ] Reboot with the service **stopped** by the user before: it stays stopped.
+- [ ] Reboot while locked (before first unlock): record whether the service starts (Keystore keys need no user authentication, but file encryption before first unlock may block it: unverified).
+- [ ] **Pairings and counters survive:** after reboot `adb shell run-as org.openhotspot.phone ls no_backup` shows `clients.bin` (debug build); the request counter continues (Pairing tab shows the request count did not reset to 0).
+- [ ] **L** reboot the laptop: `systemctl --user status openhotspot` active; pairings still work; the key (file or keyring) still resolves.
+- [ ] **T** reboot the tablet with auto-connect on: the foreground service restarts (Samsung: only with *Never sleeping apps*); pairings still work.
+- [ ] App update (`adb install -r` of a rebuilt APK): pairings survive and the service restarts (MY_PACKAGE_REPLACED).
+- [ ] Wipe app data on the phone: all pairings gone, every client then fails with AUTH_FAILED and must re-pair. Uninstall and reinstall: the Keystore key is gone too, so the same.
+
+### S8. Endurance and power
+
+- [ ] Phone service left running for 24 h with the screen off, battery unrestricted: still advertising at the end (laptop `daemon --once` finds it); record battery use of the OpenHotspot app (Settings, Battery).
+- [ ] Advertisement token rotation across several 5-minute boundaries over 30 minutes with two clients paired: both clients keep finding the phone.
+- [ ] 50 consecutive connect/disconnect cycles from the laptop: no failure, no leaked Wi-Fi profiles, no growth in the phone's Log entries beyond its cap.
 
 ## Manual hardware checklist
 
