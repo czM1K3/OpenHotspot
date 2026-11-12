@@ -45,7 +45,7 @@ Clients use it to fail fast (for example "Shizuku not running") before sending a
 The phone advertises as connectable, with **no device name and no TX power, no manufacturer data**. The only payload is one *Service Data, 128-bit UUID* AD structure (type `0x21`) keyed by the service UUID:
 
 ```
-len(1)=0x1a | type(1)=0x21 | service UUID (16, little-endian as AD requires) | mode_ver(1) | token(8)
+len(1)=0x1a | type(1)=0x21 | service UUID (16 bytes, the RFC 4122 big-endian form fully byte-reversed, as BLE AD structures require; this is not the mixed-endian GUID layout) | mode_ver(1) | token(8)
 ```
 
 27 bytes, plus the 3-byte Flags AD that Android adds, is 30 of 31 legacy-advertising bytes. Scan response is not used.

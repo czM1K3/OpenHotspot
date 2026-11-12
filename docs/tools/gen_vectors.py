@@ -178,7 +178,7 @@ def adv_token(key, label: bytes, unix_s):
 
 def adv_ad_bytes(mode, token):
     payload = bytes([(VERSION << 4) | mode]) + token
-    return bytes([1 + 16 + len(payload), 0x21]) + SERVICE_UUID.bytes_le + payload  # Service Data - 128-bit UUID
+    return bytes([1 + 16 + len(payload), 0x21]) + SERVICE_UUID.bytes[::-1] + payload  # Service Data - 128-bit UUID; BLE sends the UUID fully byte-reversed (NOT uuid.bytes_le)
 
 def chunk(fr, mtu):
     n = mtu - 3 - 1
@@ -340,7 +340,7 @@ def verify(V):
     assert adv_token(d["k_adv"], b"OHS1 adv", a["unix_seconds"]) == h(a["paired_token"])
     assert adv_token(secret, b"OHS1 adv-pair", a["unix_seconds"]) == h(a["pairing_token"])
     ad = h(a["paired_ad_structure"]); assert len(ad) == 27 and 3 + len(ad) <= 31  # +3 for Android's flags AD
-    assert ad[0] == len(ad) - 1 and ad[1] == 0x21 and ad[2:18] == SERVICE_UUID.bytes_le and ad[18] == 0x10
+    assert ad[0] == len(ad) - 1 and ad[1] == 0x21 and ad[2:18] == SERVICE_UUID.bytes[::-1] and ad[18] == 0x10
     assert h(a["pairing_ad_structure"])[18] == 0x11
     # unauthenticated error
     e = parse_frame(h(V["error_unauthenticated"]["frame"]))

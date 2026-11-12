@@ -30,9 +30,9 @@
     "window_seconds": 300,
     "window_index": 6000000,
     "paired_token": "d9f2b8df6edc893c",
-    "paired_ad_structure": "1a2101005f7e3a8c2b4d9a610b4c7d9e1f2010d9f2b8df6edc893c",
+    "paired_ad_structure": "1a21201f9e7d4c0b619a2b4d3a8c01005f7e10d9f2b8df6edc893c",
     "pairing_token": "07006dfe489aae9a",
-    "pairing_ad_structure": "1a2101005f7e3a8c2b4d9a610b4c7d9e1f201107006dfe489aae9a"
+    "pairing_ad_structure": "1a21201f9e7d4c0b619a2b4d3a8c01005f7e1107006dfe489aae9a"
   },
   "pairing_messages": {
     "pair_req": {
