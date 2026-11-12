@@ -231,7 +231,7 @@ async def test_close_is_quiet_when_bluez_is_already_gone(transport, ble):
     (BleakDBusError("org.bluez.Error.Whatever", ["x"]), "BlueZ error", False),
     (BleakBluetoothNotAvailableError("n", BleakBluetoothNotAvailableReason.NO_BLUETOOTH), "no Bluetooth adapter", False),
     (BleakDeviceNotFoundError("AA"), "forgot the device", True),
-    (BleakError("Bleak requires BlueZ >= 5.55."), "upgrade BlueZ", False),
+    (BleakError("Bleak requires BlueZ >= 5.55."), "Upgrade BlueZ", False),
     (FileNotFoundError(), "system D-Bus", False),
     (PermissionError(), "permission denied", False),
     (asyncio.TimeoutError(), "timed out", True),
