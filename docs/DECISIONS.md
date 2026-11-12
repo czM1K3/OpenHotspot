@@ -102,6 +102,38 @@ Auto-off: shorter of client request and user setting wins; unknown client count 
 ## D31. Shell backend is dead on Android 17 with adb-mode Shizuku; kept as a root-mode fallback
 Device test (Nothing A059, Android 17): `cmd wifi start-softap` and `stop-softap` throw `SecurityException: Uid 2000 does not have access`. The TetheringManager backend works and local-only works. The shell backend is kept (it may work on older versions or with root-mode Shizuku, unverified) but the probe now reports the refusal, so it is never selected on this phone.
 
+## D32. Real BLE on Linux: bleak 3.x over BlueZ, filtered in Python, MTU from the characteristic
+`BleakTransport` (`linux-client/src/openhotspot/ble.py`) uses `bleak>=3.0,<4`; only 3.1.0 was read and exercised, since its API differs from older releases (`bluez=` argument dict, `BleakBluetoothNotAvailableError`). Choices:
+- **Scan unfiltered and match the service-data key in Python.** BlueZ's discovery UUID filter is documented for advertised service UUIDs; that it also covers *service data* keys is not something we verified, so we do not rely on it. Cost: more callbacks while scanning, bounded by the short scan windows (D35).
+- **MTU:** bleak's public `mtu_size` is hard-wired to 23 on BlueZ. We read `max_write_without_response_size + 3` from the Request characteristic (BlueZ's `GattCharacteristic1.MTU`, BlueZ >= 5.62; older BlueZ reports 20, which we treat as "unknown, use 23", PROTOCOL.md R13) and wait up to 1 s for it to rise above 20, since it can lag the connection. Unverified against a real phone.
+- **Passive scanning is optional** (`[ble] passive_scan`): a BlueZ advertisement monitor with an or-pattern on AD type `0x21` and the service UUID; if BlueZ refuses it, we fall back to an active scan.
+- **Errors:** every bleak, D-Bus and asyncio failure is translated to `BluetoothError` (summary, hint, `retryable`) in one function, `translate_error`. The D-Bus error names in its table come from BlueZ documentation and bleak's source, not from observing a broken system.
+
+## D33. Retries are bounded and never reuse a counter
+`BleakTransport.connect` retries transient BlueZ errors (in progress, connection aborted, timeout) once more. `HotspotClient` retries a whole request on a dropped link with a **new connection, a fresh scan and a new counter** (persisted before sending, as always), so a retry can never look like a replay. Not retried: no phone found (the scan already waited), a response timeout (the phone already had its 20 s), and any error the phone itself reports. The default for library users is one attempt; the CLI and daemon use `[ble] attempts` (2). Cost: a request whose answer was lost may run on the phone twice (ENABLE is idempotent).
+
+## D34. One connect sequence; verify the internet; CLI keeps, daemon undoes
+`flow.connect_flow` is used by both: enable, wait for ON, join, then verify with NetworkManager's own connectivity probe (optionally plus an HTTP URL). "Online" means NetworkManager's state is full; limited/captive-portal counts as offline. If joining works but the internet does not (phone without data, or the local-only fallback of D29) the CLI exits 1 but leaves the connection for inspection, while the daemon removes it and turns the hotspot off, because a dead network can block the laptop from joining a real one. The protocol still cannot say "this hotspot has no internet" (D29); that would be a protocol change.
+
+## D35. Daemon policy
+- Modes: `auto` connects, `manual` only notifies (one notice per interval) and `off` idles. The tray's *Connect now* overrides mode and cooldown.
+- Power: no scan at all while online (it polls NetworkManager's state); offline it scans `scan_duration_s` every `scan_interval_s` (6 s / 60 s, about a 10 % duty cycle), backing off by doubling to `max_scan_interval_s` after five misses; no scanning during a cooldown. Power use is **unmeasured** (TESTING.md section 7).
+- Cooldown is set *before* an attempt, so neither a crash nor a failure can cause a retry storm. After the user's own `disconnect`, the CLI writes `suppress_until` into `~/.local/state/openhotspot/state.json` and the daemon honours it (default 1 h). The file only affects politeness; a corrupt one is ignored.
+- Only one phone is handled (R15): `phone = "<id prefix>"` in the config picks it when several are paired.
+- The config is strict TOML: unknown keys, wrong types and silly ranges are errors (exit code 2), so a typo never silently turns a feature off.
+
+## D36. NetworkManager handling
+Unchanged: `nmcli device wifi connect` with the passphrase in the argument list (D16). Added: (a) a profile of ours left from an earlier session is deleted first, so a changed passphrase is used; (b) if the SSID is not in the scan results, rescan once, then retry with `hidden yes` (the protocol has no hidden flag, R9); (c) `disconnect` now deletes all `openhotspot-*` profiles by UUID (not just deactivating them), as the user asked; (d) failures get a hint chosen by substrings of nmcli's message. **Those substrings come from documentation and memory, not from captured real output**, so TESTING.md section 4 asks for the real texts to be compared.
+
+## D37. Tray, units, scripts, doctor
+- The tray (`pystray` 0.19.5, LGPL-3.0, with Pillow) is an optional extra and never imported otherwise. The daemon's asyncio loop runs in a worker thread and the tray owns the main thread. Menu logic is in `TrayModel` and is unit tested; the pystray binding is not (it needs a display). The icon is drawn with Pillow at run time, so there are no image assets to ship. Mode changes from the tray last until restart; they are not written to the config.
+- Two static user units: `openhotspot.service` (`default.target`) and `openhotspot-tray.service` (`graphical-session.target`, conflicts with the first), because the tray needs the desktop's environment. Hardening is only `NoNewPrivileges=yes`: stronger sandboxing options can fail on kernels without unprivileged user namespaces and could not be tried on a variety of systems.
+- `install.sh` needs no root: private venv under `~/.local/share/openhotspot`, symlink in `~/.local/bin`, config copied only if absent. `uninstall.sh` keeps keys and config unless `--purge`.
+- `openhotspot doctor` runs read-only checks (BlueZ version, adapter power, NetworkManager, Wi-Fi radio and device, NTP) with the remedy for each failure. Minimum BlueZ: 5.55 (bleak), 5.62 recommended (MTU).
+
+## D38. Async tests without a plugin
+`tests/conftest.py` runs `async def` tests with `asyncio.run` through a `pytest_pyfunc_call` hook, so `pytest-asyncio` is not needed (fewer dependencies to track). `tests/fake_ble.py` fakes bleak's scanner and client in front of the existing `FakePhone`, so `BleakTransport` runs its real code against the simulated phone.
+
 ## Dependencies and licenses
 
 | Dependency | Where | License | Status |
@@ -110,7 +142,14 @@ Device test (Nothing A059, Android 17): `cmd wifi start-softap` and `stop-softap
 | `cryptography` | `linux-client` (required); optional cross-check in `gen_vectors.py` | Apache-2.0 OR BSD-3-Clause | used |
 | Shizuku `api` and `provider` 13.1.5 | `:phone-app` | MIT (per the artifact POM; corrects the earlier Apache-2.0 guess) | used |
 | `org.lsposed.hiddenapibypass` 6.1 | `:phone-app` | Apache-2.0 (per POM) | used |
-| `bleak` | linux-client BLE transport (Batch 4) | MIT | not added |
+| `bleak` 3.1.0 (`>=3.0,<4`) | linux-client BLE transport | MIT | used |
+| `dbus-fast` | transitive via `bleak` (D-Bus client) | MIT | transitive |
+| `pystray` 0.19.5 | linux-client `tray` extra only | LGPL-3.0 (imported, not copied or bundled; optional) | optional extra |
+| `Pillow` | linux-client `tray` extra only (draws the icon) | MIT-CMU (HPND) | optional extra |
+| BlueZ (`bluetoothd`, `bluetoothctl`) | external daemon and tool, not linked | GPL-2.0-or-later | external, required at run time |
+| NetworkManager (`nmcli`) | external tool, not linked | GPL-2.0-or-later | external, required at run time |
+| `notify-send` (libnotify) | external tool, not linked | LGPL-2.1-or-later | optional external tool |
+| Python `tomllib` | config parsing | PSF (stdlib, 3.11+) | used |
 | `keyring` | linux-client optional extra | MIT | used (optional) |
 | `secretstorage` | via `keyring` on Linux (transitive) | BSD-3-Clause | transitive, optional |
 | `pytest` | linux-client dev only | MIT | dev only |

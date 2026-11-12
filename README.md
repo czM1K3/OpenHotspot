@@ -2,7 +2,7 @@
 
 Turn on the internet-sharing hotspot of a stock Android phone from a Linux laptop or an Android tablet over Bluetooth LE, and connect automatically, similar to Apple's Instant Hotspot. The phone side uses [Shizuku](https://shizuku.rikka.app/) to toggle tethering without root. No Google Play Services.
 
-**Status: protocol designed and implemented in Python (Linux client) and Kotlin (`:common`, phone app). The phone app now has real hotspot backends (Shizuku TetheringManager, `cmd wifi`, local-only) with capability detection, auto-off and a diagnostics screen, but none of it has run on a real phone yet; see docs/HOTSPOT_BACKENDS.md. No real BLE has been tested.**
+**Status: protocol designed and implemented in Python (Linux client) and Kotlin (`:common`, phone app). The phone app now has real hotspot backends (Shizuku TetheringManager, `cmd wifi`, local-only) with capability detection, auto-off and a diagnostics screen, but none of it has run on a real phone yet; see docs/HOTSPOT_BACKENDS.md. The Linux client has a real BLE transport, a daemon and a service, all tested only against mocks: no real BLE exchange has happened yet (see docs/TESTING.md).**
 
 ## Layout
 
@@ -11,12 +11,13 @@ Turn on the internet-sharing hotspot of a stock Android phone from a Linux lapto
 | `common/` | Kotlin/JVM protocol, crypto and the phone-side `PhoneEngine`; passes `docs/test-vectors.json` | working |
 | `phone-app/` | Android app (Compose): foreground service, GATT server, pairing QR, revoke, log. Hotspot backends in `hotspot/`; see `docs/HOTSPOT_BACKENDS.md` | builds, unit-tested; not tested on real BLE or Shizuku |
 | `tablet-app/` | Android app on the tablet (BLE client, Wi-Fi connect) | placeholder |
-| `linux-client/` | Python 3.11+ client: protocol, FakePhone simulator, CLI. Real BLE pending | working, no BLE |
+| `linux-client/` | Python 3.11+ client: protocol, real BLE (bleak/BlueZ), CLI, daemon, systemd user service, optional tray | unit-tested with mocked BLE; not tested on a real phone |
 | `docs/PROTOCOL.md` | Wire protocol. **Source of truth.** | v1 draft |
 | `docs/SECURITY.md` | Threat model, rate limiting, revocation, key storage | v1 draft |
 | `docs/HOTSPOT_BACKENDS.md` | Hotspot backends per Android version, verified vs unverified | written |
 | `docs/DECISIONS.md` | Decision log and dependency licenses | started |
-| `docs/SETUP.md` | User setup guide | not yet written |
+| `docs/SETUP.md` | User setup guide | Linux section written; phone and tablet to do |
+| `docs/TESTING.md` | What the tests prove, and the manual hardware checklist | written |
 | `docs/test-vectors.json` | Deterministic crypto and framing vectors | generated |
 | `docs/tools/gen_vectors.py` | Generates and self-verifies the vectors (stdlib only) | working |
 

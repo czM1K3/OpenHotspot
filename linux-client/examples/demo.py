@@ -15,11 +15,17 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # makes `tests.fake_phone` importable
 
 from openhotspot.cli import Deps, main  # noqa: E402
-from openhotspot.constants import Security  # noqa: E402
+from openhotspot.connectivity import Connectivity, ConnectivityChecker  # noqa: E402
+from openhotspot.constants import Band, Security  # noqa: E402
 from openhotspot.storage import FileKeyStore  # noqa: E402
 from openhotspot.transport import InMemoryTransport  # noqa: E402
 from openhotspot.wifi import NmcliConnector, WifiConnector  # noqa: E402
 from tests.fake_phone import FakePhone  # noqa: E402
+
+
+class AlwaysOnline(ConnectivityChecker):
+    def check(self, probe: bool = False) -> Connectivity:
+        return Connectivity.FULL
 
 
 class PrintingWifi(WifiConnector):
@@ -35,9 +41,9 @@ class PrintingWifi(WifiConnector):
         print(f"   [wifi] would run: {' '.join(shown)}")
         return subprocess.CompletedProcess(argv, 0, "", "")
 
-    def connect(self, ssid: bytes, passphrase: str, security: Security = Security.WPA2_PSK) -> None:
+    def connect(self, ssid: bytes, passphrase: str, security: Security = Security.WPA2_PSK, band: Band = Band.UNKNOWN) -> None:
         self.secret = passphrase
-        self._real.connect(ssid, passphrase, security)
+        self._real.connect(ssid, passphrase, security, band)
 
     def disconnect(self, ssid=None) -> bool:
         print("   [wifi] would run: nmcli connection down id openhotspot-<ssid>")
@@ -60,7 +66,7 @@ def demo() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         phone = FakePhone(time.time)
         deps = Deps(FileKeyStore(Path(tmp) / "openhotspot"), InMemoryTransport(phone, mtu=23), PrintingWifi(),
-                    hostname="demo-laptop")
+                    hostname="demo-laptop", connectivity=AlwaysOnline())
 
         banner("On the phone: open the pairing screen (QR code)")
         qr = phone.open_pairing()
