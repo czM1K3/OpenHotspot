@@ -75,11 +75,15 @@ class DiagnosticsRunner(
                     controller.isActive() to "still active=${controller.isActive()}; clients=${clients ?: "unknown"}"
                 }
             }
-            step("Disable hotspot") { controller.disable(); true to "stopped" }
-            step("Verify off") {
-                val deadline = clock.monotonicMs() + offTimeoutMs
-                while (controller.isActive() && clock.monotonicMs() < deadline) delay(300)
-                (!controller.isActive()) to "isActive=${controller.isActive()}"
+            // Only after a successful enable: a failed enable is already cleaned up by the controller, and a
+            // blind disable here would switch off a hotspot the user had on for other reasons.
+            if (enabled) {
+                step("Disable hotspot") { controller.disable(); true to "stopped" }
+                step("Verify off") {
+                    val deadline = clock.monotonicMs() + offTimeoutMs
+                    while (controller.isActive() && clock.monotonicMs() < deadline) delay(300)
+                    (!controller.isActive()) to "isActive=${controller.isActive()}"
+                }
             }
         } finally {
             _running.value = false

@@ -1,6 +1,5 @@
 package org.openhotspot.phone.hotspot
 
-import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -8,7 +7,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.runInterruptible
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.openhotspot.common.Band
 import org.openhotspot.common.Security
@@ -37,13 +36,21 @@ class ShizukuShellRunner(private val io: CoroutineDispatcher = Dispatchers.IO) :
             m.isAccessible = true
             m.invoke(null, args.toTypedArray(), null, null) as Process
         }
+        // ShizukuRemoteProcess.waitFor(timeout, unit) throws IllegalArgumentException("process hasn't exited")
+        // on the device (found on Android 17, Shizuku API 14), so use the blocking waitFor() and enforce the
+        // timeout with a watchdog that destroys the process, which unblocks the reads and the wait.
+        var timedOut = false
         try {
             coroutineScope {
+                val watchdog = launch { delay(timeoutMs); timedOut = true; process.destroy() }
                 val out = async { process.inputStream.bufferedReader().readText() }
                 val err = async { process.errorStream.bufferedReader().readText() }
-                val finished = runInterruptible { process.waitFor(timeoutMs, TimeUnit.MILLISECONDS) }
-                if (!finished) throw BackendException(FailureKind.TIMEOUT, "'${args.take(3).joinToString(" ")}' did not finish in $timeoutMs ms")
-                ShellResult(process.exitValue(), out.await(), err.await())
+                val stdout = try { out.await() } catch (e: java.io.IOException) { "" }
+                val stderr = try { err.await() } catch (e: java.io.IOException) { "" }
+                val code = try { process.waitFor() } catch (e: Exception) { if (timedOut) -1 else throw e }
+                watchdog.cancel()
+                if (timedOut) throw BackendException(FailureKind.TIMEOUT, "'${args.take(3).joinToString(" ")}' did not finish in $timeoutMs ms")
+                ShellResult(code, stdout, stderr)
             }
         } finally {
             process.destroy()

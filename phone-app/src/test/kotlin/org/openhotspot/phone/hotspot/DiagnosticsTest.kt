@@ -32,7 +32,7 @@ class DiagnosticsTest {
         assertTrue("ssid=10 bytes" in all)
     }
 
-    @Test fun failedEnableIsReportedAndCleanupStillRuns() = runTest {
+    @Test fun failedEnableIsReportedWithoutABlindDisable() = runTest {
         val clock = TestClock(mono = { testScheduler.currentTime })
         val b = StubBackend(BackendId.SHIZUKU_TETHERING).apply { onStart = { throw BackendException(FailureKind.START_FAILED, "tethering error 5") } }
         val c = rig(backgroundScope, clock, b, RecordingLog())
@@ -44,7 +44,7 @@ class DiagnosticsTest {
         assertFalse(enable.ok)
         assertTrue("tethering error 5" in enable.detail)
         assertTrue(run.steps.none { it.name == "Query" }, "no query after a failed enable")
-        assertTrue(run.steps.any { it.name == "Disable hotspot" })
+        assertTrue(run.steps.none { it.name == "Disable hotspot" }, "no blind disable after a failed enable")
         assertFalse(runner.running.value)
     }
 
