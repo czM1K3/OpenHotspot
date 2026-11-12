@@ -257,7 +257,11 @@ class FakePhone:
         if len(self.clients) >= MAX_CLIENTS:
             return err(ErrorCode.TOO_MANY_CLIENTS)
         client_id = hashlib.sha256(client_pub).hexdigest()[:8]
-        self.clients[client_id] = ClientRecord(ltk, plaintext[9:].decode())
+        try:
+            label = plaintext[9:].decode()  # must be valid UTF-8 (PROTOCOL.md 4.3)
+        except UnicodeDecodeError:
+            return err(ErrorCode.MALFORMED)
+        self.clients[client_id] = ClientRecord(ltk, label)
         self.pairing = None  # single use
         body_plain = struct.pack(">Q", int(self.clock() * 1000)) + pair_confirm(ltk, client_pub, pairing.pub)
         header = Frame(MsgType.PAIR_RESP, frame.msg_id, b"").header
@@ -319,9 +323,11 @@ class FakePhone:
     def _execute(self, mtype: int, body: bytes, rec: ClientRecord) -> bytes:
         if mtype == MsgType.ENABLE:
             try:
-                unpack_enable_body(body)
+                options, _ = unpack_enable_body(body)
             except ProtocolError:
                 raise _RequestError(ErrorCode.MALFORMED)
+            if options != 0:
+                raise _RequestError(ErrorCode.UNSUPPORTED_REQUEST)
             if not self.shizuku_ready:
                 raise _RequestError(ErrorCode.SHIZUKU_UNAVAILABLE)
             if not self.shizuku_permission:

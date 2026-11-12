@@ -184,6 +184,19 @@ def test_status_characteristic(phone, make_client):
     assert run(client.read_status(paired)).hotspot_active
 
 
+def test_unknown_enable_options_are_unsupported(phone, make_client, clock):
+    client, transport, _ = make_client()
+    rec = pair(phone, client)
+    conn = raw_connection(transport, client, rec)
+    keys = rec.keys
+    frame, nonce = build_request(keys.k_req, MsgType.ENABLE, 3, int(clock() * 1000), 1, pack_enable_body(options=1))
+    with pytest.raises(PhoneError) as e:
+        parse_response(keys.k_resp, run(client.exchange(conn, frame)), request_type=MsgType.ENABLE,
+                       request_msg_id=3, request_nonce=nonce, request_counter=1)
+    assert e.value.code == ErrorCode.UNSUPPORTED_REQUEST and e.value.authenticated
+    assert phone.enable_calls == 0
+
+
 # ---- replay ----------------------------------------------------------------------------------
 
 def test_replayed_request_is_rejected_without_acting_or_rate_limiting(phone, make_client, clock):

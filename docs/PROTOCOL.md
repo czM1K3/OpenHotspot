@@ -106,7 +106,7 @@ LTK    = HKDF(salt = pairing_secret, ikm = dh, info = "OHS1 ltk"  ‖ transcript
 
 `LTK` is the **per-device long-term key**. The phone stores one `LTK` per paired client; the client stores one per phone. `K_pair` is used only for the two pairing messages.
 
-5. Client sends `PAIR_REQ` (type `0x01`), body `client_pub(32) ‖ nonce(12) ‖ AEAD(K_pair, nonce, aad, plaintext)`. `aad = header(5) ‖ client_pub(32)`. Plaintext: `timestamp_ms(8) ‖ label_len(1) ‖ label` (UTF-8, at most 32 bytes, a display name such as "Michal's laptop", shown in the phone's paired-clients list).
+5. Client sends `PAIR_REQ` (type `0x01`), body `client_pub(32) ‖ nonce(12) ‖ AEAD(K_pair, nonce, aad, plaintext)`. `aad = header(5) ‖ client_pub(32)`. Plaintext: `timestamp_ms(8) ‖ label_len(1) ‖ label` (UTF-8, at most 32 bytes, a display name such as "Michal's laptop", shown in the phone's paired-clients list). A label that is not valid UTF-8 or exceeds 32 bytes is `MALFORMED` (authenticated, `K_pair`). Phones SHOULD treat the label as untrusted text when displaying it.
 6. Phone decrypts. Failure counts toward the 3-attempt limit. On success it checks the timestamp (section 6), stores `LTK` and the label with `last_counter = 0`, and replies `PAIR_RESP` (type `0x81`): `nonce(12) ‖ AEAD(K_pair, nonce, header ‖ req_nonce, plaintext)` where plaintext = `timestamp_ms(8) ‖ confirm(16)` and
 `confirm = HMAC-SHA256(LTK, "OHS1 pair confirm" ‖ client_pub ‖ phone_pub)[0:16]`.
 7. Client verifies the AEAD and `confirm`, then stores `LTK` and `phone_pub` (for display and diagnostics only).
@@ -166,7 +166,7 @@ For every type except plaintext `0xFF`: `body = nonce(12) ‖ ciphertext ‖ tag
 timestamp_ms(8) | counter(8) | request-specific body
 ```
 
-- ENABLE body: `options(1)` (all zero in v1) ‖ `auto_off_s(2)` (0 = phone default; the phone MAY clamp it).
+- ENABLE body: `options(1)` ‖ `auto_off_s(2)`. In v1 `options` MUST be 0; a phone receiving any other value replies `UNSUPPORTED_REQUEST` (authenticated) and does nothing. `auto_off_s` of 0 means the phone default; the phone MAY clamp other values.
 - DISABLE, QUERY, UNPAIR: empty body.
 
 ### Response plaintext
@@ -220,7 +220,7 @@ Type `0xFF`. Two forms:
 **Replay protection** (inside the AEAD plaintext):
 
 1. `timestamp_ms` MUST be within **±60 s** of the receiver's clock, else `STALE_TIMESTAMP` (authenticated error).
-2. `counter` is a 64-bit integer per client (key), starting at 1 and strictly increasing; the client persists it **before** sending. The phone stores `last_counter` per client and requires `counter > last_counter`, else `REPLAY`. It updates `last_counter` only after full AEAD success **and** timestamp success, and before acting on the request.
+2. `counter` is an **unsigned** 64-bit integer per client (key), starting at 1 and strictly increasing (compared as unsigned; a client MUST NOT send a counter above 2^64-1, and a runtime without unsigned integers MUST use unsigned comparison); the client persists it **before** sending. The phone stores `last_counter` per client and requires `counter > last_counter`, else `REPLAY`. It updates `last_counter` only after full AEAD success **and** timestamp success, and before acting on the request.
 3. Responses are protected by the nonce binding and the echoed counter; the client MUST verify the echo equals its request and the timestamp is within ±60 s.
 
 Residual risk: an attacker who captures a request, prevents its delivery, then replays it within the 60 s window can trigger one hotspot activation. The response is encrypted to the client, so nothing leaks; see SECURITY.md.
