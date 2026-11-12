@@ -19,6 +19,8 @@ dependencyResolutionManagement {
             content {
                 includeGroupByRegex("com\\.android.*")
                 includeGroupByRegex("com\\.google\\.android.*")
+                includeGroupByRegex("com\\.google\\.mlkit.*")
+                includeGroupByRegex("com\\.google\\.firebase.*")
                 includeGroupByRegex("androidx.*")
             }
         }
@@ -30,4 +32,4 @@ rootProject.name = "OpenHotspot"
 
 include(":common")
 include(":phone-app")
-// :tablet-app is added in a later batch.
+include(":tablet-app")

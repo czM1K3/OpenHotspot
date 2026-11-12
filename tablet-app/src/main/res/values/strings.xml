@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">OpenHotspot</string>
+    <string name="channel_name">Auto-connect</string>
+    <string name="notification_title">OpenHotspot is watching</string>
+    <string name="notification_text">Connects to your phone\'s hotspot when there is no internet and it is nearby.</string>
+    <string name="action_stop">Stop</string>
+    <string name="tile_label">Phone hotspot</string>
+    <string name="tile_tap">Tap to connect</string>
+    <string name="tile_connecting">Connecting…</string>
+    <string name="tile_failed">Failed, tap to retry</string>
+    <string name="tile_no_phone">Pair a phone first</string>
+</resources>
